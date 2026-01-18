@@ -1,6 +1,8 @@
 # 🪣 S3 Viewer
 
-A simple and versatile S3 viewer supporting multiple S3-compatible storage providers.  
+A simple and versatile S3 viewer supporting multiple S3-compatible storage providers.
+
+![](.github/docs/images/screenshot.png)
 
 **Supported providers:**
 
