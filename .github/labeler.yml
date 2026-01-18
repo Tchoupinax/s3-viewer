@@ -40,7 +40,7 @@ labels:
     matcher:
       files:
         any:
-          - ".github/**"
+          - ".github/workflows"
 
   - label: "docs"
     sync: true # remove label if match failed, default: false
