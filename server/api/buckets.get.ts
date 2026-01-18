@@ -8,9 +8,12 @@ import {
 import { match, P } from "ts-pattern";
 import { connections } from "~/server/utils/s3";
 import prettyBytes from "pretty-bytes";
+import { groupByFn } from "~/server/utils/functions";
 
 export default defineEventHandler(
-  async (): Promise<S3ViewerResponse<Array<S3ViewerBucket>>> => {
+  async (): Promise<
+    S3ViewerResponse<{ buckets: Array<S3ViewerBucket>; stats: {} }>
+  > => {
     const commmands = await Promise.all(
       connections.map(
         async ({ connection, organizationOrAccountName, id }) => ({
@@ -27,11 +30,38 @@ export default defineEventHandler(
       ),
     );
 
+    const buckets = (await Promise.all(commmands.map(mapToS3ViewerBuckets)))
+      .flat()
+      .sort((a, b) => (a.name > b.name ? 1 : -1));
+
+    function totalSizeByKey(
+      bucketsByKey: Record<string, S3ViewerBucket[]>,
+    ): Record<string, number> {
+      return Object.fromEntries(
+        Object.entries(bucketsByKey).map(([key, buckets]) => [
+          key,
+          buckets.reduce((sum, b) => sum + b.size, 0),
+        ]),
+      );
+    }
+
+    const stats = totalSizeByKey(
+      groupByFn(buckets, (b) => b.cloudProvider.name ?? ""),
+    );
+
     return {
       status: "OK",
-      data: (await Promise.all(commmands.map(mapToS3ViewerBuckets)))
-        .flat()
-        .sort((a, b) => (a.name > b.name ? 1 : -1)),
+      data: {
+        buckets,
+        stats: Object.keys(stats).map((key) => ({
+          cloudProvider: {
+            name: key || null,
+            logoUrl: getCloudProviderLogoUrl(key),
+          },
+          size: stats[key],
+          sizeHuman: prettyBytes(stats[key]),
+        })),
+      },
     };
   },
 );
