@@ -18,8 +18,8 @@ A simple and versatile S3 viewer supporting multiple S3-compatible storage provi
 
 Your have two options to get images:
 
-- `docker.io/tchoupinax/s3-viewer:v0.1.3`
-- `ghcr.io/tchoupinax/s3-viewer:v0.1.3`
+- `docker.io/tchoupinax/s3-viewer:v0.2.0`
+- `ghcr.io/tchoupinax/s3-viewer:v0.2.0`
 
 ### How to add a S3 API
 
