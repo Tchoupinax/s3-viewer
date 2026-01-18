@@ -1,0 +1,13 @@
+FROM node:24-alpine
+
+USER root
+
+WORKDIR /app
+
+COPY package.json yarn.lock /app/
+
+RUN yarn
+
+COPY . .
+
+CMD ["yarn", "watch"]
