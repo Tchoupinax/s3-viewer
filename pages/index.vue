@@ -1,35 +1,35 @@
 <template>
   <div class="h-screen overflow-hidden bg-gray-50">
     <div class="flex flex-col h-full p-6 mx-auto max-w-8xl">
-<header class="flex items-start justify-between gap-6 shrink-0">
-  <div>
-    <h1 class="text-2xl font-semibold text-gray-900">S3 Viewer</h1>
-    <p class="text-sm text-gray-500">Browse buckets and documents</p>
-  </div>
+      <header class="flex items-start justify-between gap-6 shrink-0">
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-900">S3 Viewer</h1>
+          <p class="text-sm text-gray-500">Browse buckets and documents</p>
+        </div>
 
-  <div class="flex gap-4">
-    <div
-      v-for="stat of stats"
-      :key="stat.cloudProvider.name"
-      class="flex items-center gap-3 px-4 py-3 transition bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow"
-    >
-      <img
-        class="rounded size-9"
-        :src="stat.cloudProvider.logoUrl"
-        :alt="stat.cloudProvider.name"
-      />
+        <div class="flex gap-4">
+          <div
+            v-for="stat of stats"
+            :key="stat.cloudProvider.name"
+            class="flex items-center gap-3 px-4 py-3 transition bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow"
+          >
+            <img
+              class="rounded size-9"
+              :src="stat.cloudProvider.logoUrl"
+              :alt="stat.cloudProvider.name"
+            />
 
-      <div class="flex flex-col leading-tight">
-        <span class="text-xs text-gray-500">
-          {{ stat.cloudProvider.name }}
-        </span>
-        <span class="text-sm font-semibold text-gray-900">
-          {{ stat.sizeHuman }}
-        </span>
-      </div>
-    </div>
-  </div>
-</header>
+            <div class="flex flex-col leading-tight">
+              <span class="text-xs text-gray-500">
+                {{ stat.cloudProvider.name }}
+              </span>
+              <span class="text-sm font-semibold text-gray-900">
+                {{ stat.sizeHuman }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
 
       <div
         v-if="error"
@@ -44,10 +44,52 @@
         <section
           class="flex flex-col overflow-hidden bg-white border rounded-lg shadow-sm"
         >
-          <div class="px-4 py-3 border-b shrink-0">
+          <div
+            class="flex items-center justify-between px-4 py-3 border-b shrink-0"
+          >
             <h2 class="text-sm font-medium text-gray-700">
               Buckets ({{ buckets.length }})
             </h2>
+
+            <div class="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+              <button
+                @click="
+                  sortBy === 'name'
+                    ? (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')
+                    : ((sortBy = 'name'), (sortDirection = 'asc'))
+                "
+                :class="[
+                  'px-3 py-1.5 text-xs rounded-md transition',
+                  sortBy === 'name'
+                    ? 'bg-white shadow text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700',
+                ]"
+              >
+                Name
+                <span v-if="sortBy === 'name'" class="ml-1 text-[10px]">
+                  {{ sortDirection === "asc" ? "↑" : "↓" }}
+                </span>
+              </button>
+
+              <button
+                @click="
+                  sortBy === 'size'
+                    ? (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')
+                    : ((sortBy = 'size'), (sortDirection = 'asc'))
+                "
+                :class="[
+                  'px-3 py-1.5 text-xs rounded-md transition',
+                  sortBy === 'size'
+                    ? 'bg-white shadow text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700',
+                ]"
+              >
+                Size
+                <span v-if="sortBy === 'size'" class="ml-1 text-[10px]">
+                  {{ sortDirection === "asc" ? "↑" : "↓" }}
+                </span>
+              </button>
+            </div>
           </div>
 
           <div class="flex-1 p-4 overflow-y-auto">
@@ -56,7 +98,10 @@
             </p>
 
             <ul v-else class="space-y-2">
-              <li v-for="bucket in buckets" :key="bucket.name">
+              <li
+                v-for="(bucket, bucketIndex) in sortedBuckets"
+                :key="bucketIndex"
+              >
                 <button
                   @click="selectBucket(bucket.id)"
                   :class="[
@@ -175,6 +220,7 @@ import { ref, onMounted } from "vue";
 import { format } from "timeago.js";
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { S3ViewerDocument } from "~/server/types/document";
+import { match } from "ts-pattern";
 
 useHead({
   title: "🚀 DEV 🚀 S3 Viewer",
@@ -191,12 +237,31 @@ const currentDirectory = ref("<root>");
 const currentFiles = ref([]);
 const currentIndexes = ref<number[]>([]);
 const stats = ref();
+const sortBy = ref<"name" | "size">("name");
+const sortDirection = ref<"asc" | "desc">("asc");
 
 const loadingBuckets = ref(false);
 const loadingDocuments = ref(false);
 const error = ref<string | null>(null);
 
 const PAGE_SIZE = 20;
+
+const sortedBuckets = computed(() =>
+  buckets.value.sort((a, b) =>
+    match(sortBy.value)
+      .with("name", () =>
+        (sortDirection.value === "asc" ? a.name > b.name : a.name < b.name)
+          ? 1
+          : -1,
+      )
+      .with("size", () =>
+        (sortDirection.value === "asc" ? a.size > b.size : a.size < b.size)
+          ? -1
+          : 1,
+      )
+      .exhaustive(),
+  ),
+);
 
 const selectBucket = async (id: string) => {
   selectedBucketId.value = id;
