@@ -98,10 +98,7 @@
             </p>
 
             <ul v-else class="space-y-2">
-              <li
-                v-for="(bucket, bucketIndex) in sortedBuckets"
-                :key="bucketIndex"
-              >
+              <li v-for="bucket in sortedBuckets" :key="bucket.id">
                 <button
                   @click="selectBucket(bucket.id)"
                   :class="[
@@ -222,12 +219,15 @@ import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { S3ViewerDocument } from "~/server/types/document";
 import { match } from "ts-pattern";
 
-useHead({
-  title: "🚀 DEV 🚀 S3 Viewer",
-});
-
 const $router = useRouter();
 const $route = useRoute();
+
+useHead({
+  title:
+    window?.location && new URL(window?.location?.toString()).hostname === "localhost"
+      ? "🚀 DEV 🚀 S3 Viewer"
+      : "S3 Viewer",
+});
 
 const buckets = ref<Array<S3ViewerBucket>>([]);
 const selectedBucketId = ref<string | null>(null);
@@ -247,7 +247,7 @@ const error = ref<string | null>(null);
 const PAGE_SIZE = 20;
 
 const sortedBuckets = computed(() =>
-  buckets.value.sort((a, b) =>
+  buckets.value.toSorted((a, b) =>
     match(sortBy.value)
       .with("name", () =>
         (sortDirection.value === "asc" ? a.name > b.name : a.name < b.name)
@@ -323,26 +323,6 @@ const loadDocuments = async (reset = false) => {
   }
 };
 
-onMounted(() => {
-  loadBuckets();
-
-  const localCurrentDirectory = $route.query.current_directory as string;
-  if (localCurrentDirectory) {
-    currentDirectory.value = localCurrentDirectory;
-
-    if (currentFiles.value) {
-      const parts = localCurrentDirectory.split("/");
-      for (const part of parts.slice(1)) {
-        const folderIndex = currentFiles.value.findIndex(
-          (f) => f.name === part,
-        );
-        currentFiles.value = currentFiles.value[folderIndex]?.children ?? [];
-        currentIndexes.value.push(folderIndex);
-      }
-    }
-  }
-});
-
 const handleDirectoryEntered = (folderName: string) => {
   const folderIndex = currentFiles.value.findIndex(
     (f) => f.name === folderName,
@@ -371,4 +351,24 @@ const handleDirectoryLeft = () => {
     .slice(0, -1)
     .join("/");
 };
+
+onMounted(() => {
+  loadBuckets();
+
+  const localCurrentDirectory = $route.query.current_directory as string;
+  if (localCurrentDirectory) {
+    currentDirectory.value = localCurrentDirectory;
+
+    if (currentFiles.value) {
+      const parts = localCurrentDirectory.split("/");
+      for (const part of parts.slice(1)) {
+        const folderIndex = currentFiles.value.findIndex(
+          (f) => f.name === part,
+        );
+        currentFiles.value = currentFiles.value[folderIndex]?.children ?? [];
+        currentIndexes.value.push(folderIndex);
+      }
+    }
+  }
+});
 </script>
