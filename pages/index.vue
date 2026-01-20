@@ -7,7 +7,7 @@
           <p class="text-sm text-gray-500">Browse buckets and documents</p>
         </div>
 
-        <div class="flex gap-4">
+        <div class="flex h-16 gap-2">
           <div
             v-for="stat of stats"
             :key="stat.cloudProvider.name"
@@ -52,7 +52,9 @@
             </h2>
 
             <div class="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+              <!-- SORT BY NAME -->
               <button
+                :disabled="loadingBuckets"
                 @click="
                   sortBy === 'name'
                     ? (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')
@@ -62,7 +64,10 @@
                   'px-3 py-1.5 text-xs rounded-md transition',
                   sortBy === 'name'
                     ? 'bg-white shadow text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700',
+                    : 'text-gray-500',
+                  loadingBuckets || buckets.length === 0
+                    ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                    : 'hover:text-gray-700 hover:bg-white',
                 ]"
               >
                 Name
@@ -72,6 +77,7 @@
               </button>
 
               <button
+                :disabled="loadingBuckets"
                 @click="
                   sortBy === 'size'
                     ? (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')
@@ -81,7 +87,10 @@
                   'px-3 py-1.5 text-xs rounded-md transition',
                   sortBy === 'size'
                     ? 'bg-white shadow text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700',
+                    : 'text-gray-500',
+                  loadingBuckets || buckets.length === 0
+                    ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                    : 'hover:text-gray-700 hover:bg-white',
                 ]"
               >
                 Size
@@ -130,7 +139,7 @@
             </ul>
           </div>
         </section>
-        <!-- RIGHT CONTENT -->
+
         <section
           v-if="selectedBucketId"
           class="flex flex-col overflow-hidden bg-white border rounded-lg shadow-sm lg:col-span-2"
