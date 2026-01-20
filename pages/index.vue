@@ -52,7 +52,6 @@
             </h2>
 
             <div class="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
-              <!-- SORT BY NAME -->
               <button
                 :disabled="loadingBuckets"
                 @click="
