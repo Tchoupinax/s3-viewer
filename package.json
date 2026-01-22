@@ -25,7 +25,7 @@
     "vue-router": "4.6.4"
   },
   "devDependencies": {
-    "@types/node": "25.0.9",
+    "@types/node": "25.0.10",
     "eslint-plugin-perfectionist": "5.3.1"
   }
 }
