@@ -8,6 +8,7 @@ export type S3ViewerBucket = {
   region: string | null;
   size: number;
   sizeHuman: string;
+  errorMessage: string | null;
 };
 
 type CloudProvider = {

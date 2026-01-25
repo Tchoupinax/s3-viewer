@@ -12,38 +12,43 @@ import { groupByFn } from "~/server/utils/functions";
 
 export default defineEventHandler(
   async (): Promise<
-    S3ViewerResponse<{ buckets: Array<S3ViewerBucket>; stats: {} }>
+    S3ViewerResponse<{
+      buckets: Array<S3ViewerBucket>;
+      stats: {};
+    }>
   > => {
     const commmands = await Promise.all(
-      connections.map(
-        async ({ connection, organizationOrAccountName, id }) => ({
-          buckets:
-            (await connection
-              .send(new ListBucketsCommand({}))
-              .then((c) => c.Buckets)) ?? [],
-          region: (await connection.config.region()) ?? null,
-          cloudProviderName: await extractCloudProviderName(connection),
+      connections.map(async ({ connection, organizationOrAccountName, id }) => {
+        let errorMessage: string | null = null;
+
+        const buckets = await connection
+          .send(new ListBucketsCommand({}))
+          .then((c) => c.Buckets ?? [])
+          .catch((error) => {
+            errorMessage = error.message ?? null;
+            return [];
+          });
+
+        return {
+          buckets: buckets,
+          region: await connection.config
+            .region()
+            .then((region) => region ?? null)
+            .catch(() => null),
+          cloudProviderName: await extractCloudProviderName(connection).catch(
+            () => null,
+          ),
           organizationOrAccountName,
           accountId: id,
           connection,
-        }),
-      ),
+          errorMessage: errorMessage,
+        };
+      }),
     );
 
-    const buckets = (await Promise.all(commmands.map(mapToS3ViewerBuckets)))
-      .flat()
-      .sort((a, b) => (a.name > b.name ? 1 : -1));
-
-    function totalSizeByKey(
-      bucketsByKey: Record<string, S3ViewerBucket[]>,
-    ): Record<string, number> {
-      return Object.fromEntries(
-        Object.entries(bucketsByKey).map(([key, buckets]) => [
-          key,
-          buckets.reduce((sum, b) => sum + b.size, 0),
-        ]),
-      );
-    }
+    const buckets = (
+      await Promise.all(commmands.map(mapToS3ViewerBuckets))
+    ).flat();
 
     const stats = totalSizeByKey(
       groupByFn(buckets, (b) => b.cloudProvider.name ?? ""),
@@ -66,6 +71,17 @@ export default defineEventHandler(
   },
 );
 
+function totalSizeByKey(
+  bucketsByKey: Record<string, S3ViewerBucket[]>,
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(bucketsByKey).map(([key, buckets]) => [
+      key,
+      buckets.reduce((sum, b) => sum + b.size, 0),
+    ]),
+  );
+}
+
 export async function mapToS3ViewerBuckets({
   buckets,
   region,
@@ -73,6 +89,7 @@ export async function mapToS3ViewerBuckets({
   organizationOrAccountName,
   accountId,
   connection,
+  errorMessage,
 }: {
   buckets: Array<Bucket>;
   region: string | null;
@@ -80,14 +97,18 @@ export async function mapToS3ViewerBuckets({
   organizationOrAccountName: string;
   accountId: string;
   connection: S3Client;
+  errorMessage: string | null;
 }): Promise<Array<S3ViewerBucket>> {
   async function mapToS3ViewerBucket(bucket: Bucket): Promise<S3ViewerBucket> {
     const name = bucket.Name ?? "";
-    const bucketSize = await getBucketSize(connection, bucket.Name ?? "");
+    const bucketSize =
+      errorMessage === null
+        ? await getBucketSize(connection, bucket.Name ?? "")
+        : 0;
 
     return {
       id: `${accountId}__${name}__${organizationOrAccountName}__${region}`,
-      name: bucket.Name ?? "",
+      name: bucket.Name ?? "_",
       cloudProvider: {
         name: cloudProviderName || null,
         logoUrl: getCloudProviderLogoUrl(cloudProviderName),
@@ -98,7 +119,28 @@ export async function mapToS3ViewerBuckets({
       accountId,
       size: bucketSize,
       sizeHuman: prettyBytes(bucketSize),
+      errorMessage,
     };
+  }
+
+  if (buckets.length === 0 && errorMessage !== null) {
+    return [
+      {
+        id: `${accountId}___${organizationOrAccountName}`,
+        errorMessage,
+        organizationOrAccountName,
+        cloudProvider: {
+          name: cloudProviderName || null,
+          logoUrl: getCloudProviderLogoUrl(cloudProviderName),
+        },
+        accountId,
+        region,
+        name: "This",
+        size: 0,
+        sizeHuman: "0",
+        createdAt: null,
+      },
+    ];
   }
 
   return Promise.all(buckets.map(mapToS3ViewerBucket));
@@ -112,8 +154,7 @@ export async function extractCloudProviderName(
       return match((await endpoint()).hostname)
         .with("s3.fr-par.scw.cloud", () => "Scaleway")
         .with("s3.eu-west-3.amazonaws.com", () => "AWS")
-        .otherwise((endpoint) => {
-          console.log(endpoint);
+        .otherwise(() => {
           return "Garage";
         });
     })
