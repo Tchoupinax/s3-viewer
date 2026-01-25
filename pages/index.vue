@@ -108,12 +108,14 @@
             <ul v-else class="space-y-2">
               <li v-for="bucket in sortedBuckets" :key="bucket.id">
                 <button
-                  @click="selectBucket(bucket.id)"
+                  @click="bucket.errorMessage === null ? selectBucket(bucket.id) : ''"
                   :class="[
                     'w-full flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition',
                     selectedBucketId === bucket.id
                       ? 'bg-blue-50 text-blue-700'
                       : 'hover:bg-gray-50 text-gray-700',
+                    bucket.errorMessage !== null
+                      ? 'text-red-500 cursor-not-allowed hover:bg-red-50': ''
                   ]"
                 >
                   <img
@@ -124,8 +126,8 @@
 
                   <div class="flex-1">
                     <div class="flex justify-between font-medium">
-                      <h2 class="text-lg">{{ bucket.name }}</h2>
-                      <p class="text-sm">{{ bucket.sizeHuman }}</p>
+                      <h2 class="text-lg">{{ bucket.errorMessage ?? bucket.name }}</h2>
+                      <p v-if="bucket.errorMessage === null" class="text-sm">{{ bucket.sizeHuman }}</p>
                     </div>
                     <div class="text-xs text-gray-500">
                       {{ bucket.cloudProvider.name }} ·
@@ -250,7 +252,7 @@ const sortDirection = ref<"asc" | "desc">("asc");
 
 const loadingBuckets = ref(false);
 const loadingDocuments = ref(false);
-const error = ref<string | null>(null);
+const errors = ref<Array<string>>([]);
 
 const PAGE_SIZE = 20;
 
@@ -271,6 +273,20 @@ const sortedBuckets = computed(() =>
   ),
 );
 
+const loadBuckets = async () => {
+  loadingBuckets.value = true;
+
+  try {
+    const res = await $fetch("/api/buckets");
+    buckets.value = res.data.buckets;
+    stats.value = res.data.stats;
+  } catch (e: any) {
+    error.value = e?.statusMessage || "Failed to load buckets";
+  } finally {
+    loadingBuckets.value = false;
+  }
+};
+
 const selectBucket = async (id: string) => {
   selectedBucketId.value = id;
 
@@ -284,21 +300,6 @@ const selectBucket = async (id: string) => {
   } finally {
     loadingBuckets.value = false;
     $router.replace({ query: { ...$route.query, bucket: id } });
-  }
-};
-
-const loadBuckets = async () => {
-  loadingBuckets.value = true;
-  error.value = null;
-
-  try {
-    const res = await $fetch("/api/buckets");
-    buckets.value = res.data.buckets;
-    stats.value = res.data.stats;
-  } catch (e: any) {
-    error.value = e?.statusMessage || "Failed to load buckets";
-  } finally {
-    loadingBuckets.value = false;
   }
 };
 
