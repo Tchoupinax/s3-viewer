@@ -10,7 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.975.0",
+    "@aws-sdk/client-s3": "3.978.0",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "1.13.0",
     "@nuxt/hints": "1.0.0-alpha.6",
