@@ -9,6 +9,8 @@ import { match, P } from "ts-pattern";
 import { connections } from "~/server/utils/s3";
 import prettyBytes from "pretty-bytes";
 import { groupByFn } from "~/server/utils/functions";
+import { store } from "~/server/api/repositories/in-memory-store";
+import { generateBucketIdentityNumber } from "../../functions/bucket-identity-number";
 
 export default defineEventHandler(
   async (): Promise<
@@ -50,6 +52,8 @@ export default defineEventHandler(
       await Promise.all(commmands.map(mapToS3ViewerBuckets))
     ).flat();
 
+    store.persistBuckets(buckets);
+
     const stats = totalSizeByKey(
       groupByFn(buckets, (b) => b.cloudProvider.name ?? ""),
     );
@@ -64,7 +68,7 @@ export default defineEventHandler(
             logoUrl: getCloudProviderLogoUrl(key),
           },
           size: stats[key],
-          sizeHuman: prettyBytes(stats[key]),
+          sizeHuman: stats[key] ? prettyBytes(stats[key]) : "0",
         })),
       },
     };
@@ -100,14 +104,17 @@ export async function mapToS3ViewerBuckets({
   errorMessage: string | null;
 }): Promise<Array<S3ViewerBucket>> {
   async function mapToS3ViewerBucket(bucket: Bucket): Promise<S3ViewerBucket> {
-    const name = bucket.Name ?? "";
     const bucketSize =
       errorMessage === null
         ? await getBucketSize(connection, bucket.Name ?? "")
         : 0;
 
     return {
-      id: `${accountId}__${name}__${organizationOrAccountName}__${region}`,
+      id: generateBucketIdentityNumber({
+        accountId,
+        bucketName: bucket.Name ?? "_",
+        region: region ?? "_",
+      }),
       name: bucket.Name ?? "_",
       cloudProvider: {
         name: cloudProviderName || null,
@@ -126,7 +133,11 @@ export async function mapToS3ViewerBuckets({
   if (buckets.length === 0 && errorMessage !== null) {
     return [
       {
-        id: `${accountId}___${organizationOrAccountName}`,
+        id: generateBucketIdentityNumber({
+          accountId,
+          bucketName: null,
+          region: region ?? "_",
+        }),
         errorMessage,
         organizationOrAccountName,
         cloudProvider: {

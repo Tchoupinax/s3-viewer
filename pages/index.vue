@@ -1,5 +1,13 @@
 <template>
   <div class="h-screen overflow-hidden bg-gray-50">
+    <FileDisplaying
+      v-if="displayedFile"
+      :filename="displayedFile.filename"
+      :bucketId="displayedFile.bucketId"
+      @close="displayedFile = null"
+    >
+    </FileDisplaying>
+
     <div class="flex flex-col h-full p-6 mx-auto max-w-8xl">
       <header class="flex items-start justify-between gap-6 shrink-0">
         <div>
@@ -32,10 +40,10 @@
       </header>
 
       <div
-        v-if="error"
+        v-if="errors.length"
         class="p-4 mt-4 text-sm text-red-700 border border-red-200 rounded-md shrink-0 bg-red-50"
       >
-        {{ error }}
+        {{ errors }}
       </div>
 
       <div
@@ -108,14 +116,17 @@
             <ul v-else class="space-y-2">
               <li v-for="bucket in sortedBuckets" :key="bucket.id">
                 <button
-                  @click="bucket.errorMessage === null ? selectBucket(bucket.id) : ''"
+                  @click="
+                    bucket.errorMessage === null ? selectBucket(bucket.id) : ''
+                  "
                   :class="[
                     'w-full flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition',
                     selectedBucketId === bucket.id
                       ? 'bg-blue-50 text-blue-700'
                       : 'hover:bg-gray-50 text-gray-700',
                     bucket.errorMessage !== null
-                      ? 'text-red-500 cursor-not-allowed hover:bg-red-50': ''
+                      ? 'text-red-500 cursor-not-allowed hover:bg-red-50'
+                      : '',
                   ]"
                 >
                   <img
@@ -126,8 +137,12 @@
 
                   <div class="flex-1">
                     <div class="flex justify-between font-medium">
-                      <h2 class="text-lg">{{ bucket.errorMessage ?? bucket.name }}</h2>
-                      <p v-if="bucket.errorMessage === null" class="text-sm">{{ bucket.sizeHuman }}</p>
+                      <h2 class="text-lg">
+                        {{ bucket.errorMessage ?? bucket.name }}
+                      </h2>
+                      <p v-if="bucket.errorMessage === null" class="text-sm">
+                        {{ bucket.sizeHuman }}
+                      </p>
                     </div>
                     <div class="text-xs text-gray-500">
                       {{ bucket.cloudProvider.name }} ·
@@ -154,6 +169,7 @@
             @enterDirectory="handleDirectoryEntered"
             @leaveDirectory="handleDirectoryLeft"
             :displayUploadButton="false"
+            @openFile="(filename) => openFile(filename)"
           />
 
           <!-- Documents header -->
@@ -228,27 +244,33 @@ import { format } from "timeago.js";
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { S3ViewerDocument } from "~/server/types/document";
 import { match } from "ts-pattern";
+import {
+  extractGenerateBucketIdentity,
+  type BucketIdentityNumber,
+} from "~/functions/bucket-identity-number";
 
 const $router = useRouter();
 const $route = useRoute();
 
 useHead({
   title:
-    window?.location && new URL(window?.location?.toString()).hostname === "localhost"
+    window?.location &&
+    new URL(window?.location?.toString()).hostname === "localhost"
       ? "🚀 DEV 🚀 S3 Viewer"
       : "S3 Viewer",
 });
 
 const buckets = ref<Array<S3ViewerBucket>>([]);
-const selectedBucketId = ref<string | null>(null);
-const documents = ref<Array<S3ViewerDocument>>([]);
-const documentsCount = ref<number>(0);
 const currentDirectory = ref("<root>");
 const currentFiles = ref([]);
 const currentIndexes = ref<number[]>([]);
-const stats = ref();
+const documents = ref<Array<S3ViewerDocument>>([]);
+const documentsCount = ref<number>(0);
+const displayedFile = ref<{ filename: string; bucketId: string } | null>();
+const selectedBucketId = ref<BucketIdentityNumber | null>(null);
 const sortBy = ref<"name" | "size">("name");
 const sortDirection = ref<"asc" | "desc">("asc");
+const stats = ref();
 
 const loadingBuckets = ref(false);
 const loadingDocuments = ref(false);
@@ -280,26 +302,22 @@ const loadBuckets = async () => {
     const res = await $fetch("/api/buckets");
     buckets.value = res.data.buckets;
     stats.value = res.data.stats;
-  } catch (e: any) {
-    error.value = e?.statusMessage || "Failed to load buckets";
   } finally {
     loadingBuckets.value = false;
   }
 };
 
-const selectBucket = async (id: string) => {
-  selectedBucketId.value = id;
+const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
+  selectedBucketId.value = bucketIdentityNumber;
 
   try {
-    const res = await $fetch(`/api/buckets/${id}/documents`);
+    const res = await $fetch(`/api/buckets/${bucketIdentityNumber}/documents`);
     documents.value = res.data.files;
     currentFiles.value = res.data.files ?? [];
     documentsCount.value = res.data.filesCount;
-  } catch (e: any) {
-    error.value = e?.statusMessage || "Failed to load buckets";
   } finally {
     loadingBuckets.value = false;
-    $router.replace({ query: { ...$route.query, bucket: id } });
+    $router.replace({ query: { ...$route.query, bin: bucketIdentityNumber } });
   }
 };
 
@@ -309,7 +327,6 @@ const loadDocuments = async (reset = false) => {
   }
 
   loadingDocuments.value = true;
-  error.value = null;
 
   try {
     const res = await $fetch<{
@@ -359,6 +376,15 @@ const handleDirectoryLeft = () => {
     .split("/")
     .slice(0, -1)
     .join("/");
+};
+
+const openFile = async (filename: string) => {
+  if (selectedBucketId.value) {
+    displayedFile.value = {
+      filename: filename,
+      bucketId: selectedBucketId.value,
+    };
+  }
 };
 
 onMounted(() => {

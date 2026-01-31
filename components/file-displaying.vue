@@ -1,6 +1,6 @@
 <template>
   <div
-    v-if="jsonObject || pdfUrl"
+    v-if="jsonObject || pdfUrl || imageUrl"
     class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
   >
     <div
@@ -27,6 +27,14 @@
           style="min-height: 100vh; width: 100%"
         ></object>
       </div>
+    
+      <div
+        v-if="type === 'jpg' || type === 'jpeg'"
+        class="max-h-full overflow-y-auto border border-gray-300"
+      >
+        <img v-if="imageUrl" :src="imageUrl" alt="Preview" class="block max-w-full" />
+      </div>
+
       <div v-else class="h-full p-2 pt-4 overflow-auto bg-gray-50">
         <div v-html="jsonObject"></div>
       </div>
@@ -53,12 +61,18 @@ export default {
   props: {
     filename: {
       type: String,
+      required: true,
+    },
+    bucketId: {
+      type: String,
+      required: true,
     },
   },
   data() {
     return {
       content: "",
       jsonObject: "",
+      imageUrl: null,
       pdfUrl: null,
       selectedFileName: "",
       type: "",
@@ -71,13 +85,33 @@ export default {
   },
   async mounted() {
     const encodedFilePath = btoa(encodeURIComponent(this.filename));
-    const data = await $fetch(`/api/files/download?file=${encodedFilePath}`);
+    const data = await $fetch(
+      `/api/files/download?file=${encodedFilePath}&bucketIdentityNumber=${this.bucketId}`,
+    );
+
     if (data) {
-      this.content = data.file;
-      this.type = data.type;
+      this.content = data.content;
+      this.type = data.type ?? "";
     }
 
-    if (this.type !== "pdf") {
+    if (this.type === "jpg" || this.type === "jpeg") {
+      this.imageUrl = `data:image/jpeg;base64,${this.content}`;
+    } else if (this.type === "pdf") {
+      const base64ToBlob = (base64, mimeType) => {
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        return new Blob([byteArray], { type: mimeType });
+      };
+
+      const pdfBlob = base64ToBlob(this.content, "application/pdf");
+      this.pdfUrl = URL.createObjectURL(pdfBlob);
+    }
+
+    if (false && this.type !== "pdf") {
       const shiki = await getHighlighter({
         themes: ["nord", "dark-plus"],
         langs: processLangs(this.filename),
@@ -97,20 +131,6 @@ export default {
           this.$emit("close");
         }
       });
-    } else {
-      const base64ToBlob = (base64, mimeType) => {
-        const byteCharacters = atob(base64);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        return new Blob([byteArray], { type: mimeType });
-      };
-
-      const pdfBlob = base64ToBlob(this.content, "application/pdf");
-      console.log(pdfBlob);
-      this.pdfUrl = URL.createObjectURL(pdfBlob);
     }
   },
 };

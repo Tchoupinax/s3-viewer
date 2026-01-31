@@ -3,6 +3,10 @@ import { connections } from "~/server/utils/s3";
 import prettyBytes from "pretty-bytes";
 import { S3ViewerDocument } from "~/server/types/document";
 import { buildFileTree, FileNode } from "~/server/types/file-node";
+import {
+  BucketIdentityNumber,
+  extractGenerateBucketIdentity,
+} from "~/functions/bucket-identity-number";
 
 export default defineEventHandler(
   async (
@@ -14,20 +18,23 @@ export default defineEventHandler(
       nextCursor: string | null;
     }>
   > => {
-    const bucketId = getRouterParam(event, "id");
+    const bucketIdentityNumber = getRouterParam(
+      event,
+      "id",
+    ) as BucketIdentityNumber;
     const query = getQuery(event);
 
     const limit = 3000;
     const cursor = query.cursor as string | undefined;
 
-    const [accountId, bucketName, organization, region] =
-      bucketId?.split("__") ?? "";
+    const { bucketName, accountId } =
+      extractGenerateBucketIdentity(bucketIdentityNumber);
 
     const connection = connections.find(
       (connection) => connection.id === accountId,
     );
 
-    if (!connection) {
+    if (!connection || !bucketName) {
       throw createError({
         statusCode: 404,
         statusMessage: "Bucket not found",
