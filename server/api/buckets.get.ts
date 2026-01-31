@@ -9,7 +9,6 @@ import { match, P } from "ts-pattern";
 import { connections } from "~/server/utils/s3";
 import prettyBytes from "pretty-bytes";
 import { groupByFn } from "~/server/utils/functions";
-import { store } from "~/server/api/repositories/in-memory-store";
 import { generateBucketIdentityNumber } from "../../functions/bucket-identity-number";
 
 export default defineEventHandler(
@@ -51,8 +50,6 @@ export default defineEventHandler(
     const buckets = (
       await Promise.all(commmands.map(mapToS3ViewerBuckets))
     ).flat();
-
-    store.persistBuckets(buckets);
 
     const stats = totalSizeByKey(
       groupByFn(buckets, (b) => b.cloudProvider.name ?? ""),
