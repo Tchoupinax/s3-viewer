@@ -1,11 +1,11 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border h-full flex flex-col">
-    <div class="border-b px-4 py-3 flex items-center justify-between">
+  <div class="flex flex-col h-full bg-white border rounded-lg shadow-sm">
+    <div class="flex items-center justify-between px-4 py-3 border-b">
       <div class="flex items-center gap-2 text-sm text-gray-700">
         <button
           v-if="currentLevel > 0"
           @click="back"
-          class="inline-flex items-center rounded-md border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+          class="inline-flex items-center px-2 py-1 text-xs text-gray-700 border rounded-md hover:bg-gray-50"
         >
           Back
         </button>
@@ -22,10 +22,10 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-auto p-4">
+    <div class="flex-1 p-4 overflow-auto">
       <div
         v-if="files?.length === 0"
-        class="mt-20 text-center text-sm text-gray-500"
+        class="mt-20 text-sm text-center text-gray-500"
       >
         No files found.
       </div>
@@ -36,7 +36,7 @@
           :key="file.fullPath"
         >
           <button
-            class="w-full flex items-center justify-between rounded-md px-3 py-2 text-sm transition hover:bg-gray-50"
+            class="flex items-center justify-between w-full px-3 py-2 text-sm transition rounded-md hover:bg-gray-50"
             :class="{
               'bg-blue-50 text-blue-700': selectedIndex === index,
               'text-gray-700': selectedIndex !== index,
@@ -51,7 +51,7 @@
             <div class="flex items-center gap-2 truncate">
               <IconFolder
                 v-if="file.isFolder"
-                class="shrink-0 text-gray-400"
+                class="text-gray-400 shrink-0"
               />
               <span
                 class="truncate"
@@ -80,7 +80,7 @@
 
               <IconDownload
                 v-else
-                class="text-gray-400 w-10"
+                class="w-10 text-gray-400"
               />
             </div>
           </button>
