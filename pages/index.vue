@@ -1,5 +1,7 @@
 <template>
-  <div class="h-screen overflow-hidden bg-gray-50">
+  <div
+    class="h-screen overflow-hidden bg-gradient-to-br from-sky-50 via-white to-indigo-50 text-slate-900"
+  >
     <FileDisplaying
       v-if="displayedFile"
       :filename="displayedFile.filename"
@@ -8,58 +10,93 @@
     >
     </FileDisplaying>
 
-    <div class="flex flex-col h-full p-6 mx-auto max-w-8xl">
-      <header class="flex items-start justify-between gap-6 shrink-0">
+    <div
+      class="flex flex-col h-full max-w-6xl p-4 mx-auto space-y-4 sm:p-6 lg:p-8"
+    >
+      <header
+        class="flex items-start justify-between gap-6 px-5 py-4 bg-white/80 border border-white/60 rounded-2xl shadow-sm backdrop-blur-sm shrink-0"
+      >
         <div>
-          <h1 class="text-2xl font-semibold text-gray-900">S3 Viewer</h1>
-          <p class="text-sm text-gray-500">Browse buckets and documents</p>
+          <h1 class="text-3xl font-semibold tracking-tight text-slate-900">
+            S3 Viewer
+          </h1>
+          <p class="mt-1 text-sm text-slate-500">
+            Browse buckets and documents across cloud providers
+          </p>
         </div>
 
-        <div class="flex h-16 gap-2">
-          <div
-            v-for="stat of stats"
-            :key="stat.cloudProvider.name"
-            class="flex items-center gap-3 px-4 py-3 transition bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow"
-          >
-            <img
-              class="rounded size-9"
-              :src="stat.cloudProvider.logoUrl"
-              :alt="stat.cloudProvider.name"
-            />
+        <div class="flex flex-wrap items-stretch gap-3 min-h-[4.5rem]">
+          <template v-if="stats && stats.length">
+            <div
+              v-for="stat of stats"
+              :key="stat.cloudProvider.name"
+              class="flex items-center gap-3 px-4 py-3 bg-white/90 border border-slate-100 rounded-xl shadow-sm transition hover:shadow-md hover:-translate-y-0.5"
+            >
+              <img
+                class="rounded-lg shadow-sm size-9"
+                :src="stat.cloudProvider.logoUrl"
+                :alt="stat.cloudProvider.name"
+              />
 
-            <div class="flex flex-col leading-tight">
-              <span class="text-xs text-gray-500">
-                {{ stat.cloudProvider.name }}
-              </span>
-              <span class="text-sm font-semibold text-gray-900">
-                {{ stat.sizeHuman }}
-              </span>
+              <div class="flex flex-col leading-tight">
+                <span class="text-xs font-medium text-slate-500">
+                  {{ stat.cloudProvider.name }}
+                </span>
+                <span class="text-base font-semibold text-slate-900">
+                  {{ stat.sizeHuman }}
+                </span>
+              </div>
             </div>
-          </div>
+          </template>
+
+          <template v-else>
+            <div
+              v-for="n in 2"
+              :key="n"
+              class="flex items-center gap-3 px-4 py-3 bg-white/70 border border-slate-100 rounded-xl shadow-sm"
+            >
+              <div
+                class="w-9 h-9 rounded-lg bg-slate-100/90 animate-pulse"
+              ></div>
+
+              <div class="flex flex-col gap-1 leading-tight">
+                <span
+                  class="w-16 h-2 rounded-full bg-slate-100/90 animate-pulse"
+                ></span>
+                <span
+                  class="w-20 h-3 rounded-full bg-slate-200 animate-pulse"
+                ></span>
+              </div>
+            </div>
+          </template>
         </div>
       </header>
 
       <div
         v-if="errors.length"
-        class="p-4 mt-4 text-sm text-red-700 border border-red-200 rounded-md shrink-0 bg-red-50"
+        class="p-4 mt-4 text-sm text-red-700 border border-red-100 rounded-xl shrink-0 bg-red-50/80 shadow-sm"
       >
         {{ errors }}
       </div>
 
       <div
-        class="grid flex-1 grid-cols-1 gap-6 mt-6 overflow-hidden lg:grid-cols-3"
+        class="grid flex-1 grid-cols-1 gap-5 mt-6 overflow-hidden lg:grid-cols-3"
       >
         <section
-          class="flex flex-col overflow-hidden bg-white border rounded-lg shadow-sm"
+          class="flex flex-col overflow-hidden bg-white/80 border border-slate-100 rounded-2xl shadow-sm backdrop-blur"
         >
           <div
-            class="flex items-center justify-between px-4 py-3 border-b shrink-0"
+            class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
           >
-            <h2 class="text-sm font-medium text-gray-700">
+            <h2
+              class="text-xs font-semibold tracking-wide text-slate-600 uppercase"
+            >
               Buckets ({{ buckets.length }})
             </h2>
 
-            <div class="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+            <div
+              class="flex items-center gap-1 p-0.5 bg-slate-100 rounded-full"
+            >
               <button
                 :disabled="loadingBuckets"
                 @click="
@@ -68,13 +105,13 @@
                     : ((sortBy = 'name'), (sortDirection = 'asc'))
                 "
                 :class="[
-                  'px-3 py-1.5 text-xs rounded-md transition',
+                  'px-3 py-1.5 text-xs rounded-full transition',
                   sortBy === 'name'
-                    ? 'bg-white shadow text-gray-900'
-                    : 'text-gray-500',
+                    ? 'bg-white shadow-sm text-slate-900'
+                    : 'text-slate-500',
                   loadingBuckets || buckets.length === 0
                     ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
-                    : 'hover:text-gray-700 hover:bg-white',
+                    : 'hover:text-slate-700 hover:bg-white',
                 ]"
               >
                 Name
@@ -91,13 +128,13 @@
                     : ((sortBy = 'size'), (sortDirection = 'asc'))
                 "
                 :class="[
-                  'px-3 py-1.5 text-xs rounded-md transition',
+                  'px-3 py-1.5 text-xs rounded-full transition',
                   sortBy === 'size'
-                    ? 'bg-white shadow text-gray-900'
-                    : 'text-gray-500',
+                    ? 'bg-white shadow-sm text-slate-900'
+                    : 'text-slate-500',
                   loadingBuckets || buckets.length === 0
                     ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
-                    : 'hover:text-gray-700 hover:bg-white',
+                    : 'hover:text-slate-700 hover:bg-white',
                 ]"
               >
                 Size
@@ -109,9 +146,24 @@
           </div>
 
           <div class="flex-1 p-4 overflow-y-auto">
-            <p v-if="loadingBuckets" class="text-sm text-gray-500">
-              Loading buckets…
-            </p>
+            <div
+              v-if="loadingBuckets"
+              class="flex items-center justify-center h-full"
+            >
+              <div class="cube-loader flex flex-col items-center gap-3">
+                <div class="cube-grid">
+                  <span class="cube-piece cube-piece-1"></span>
+                  <span class="cube-piece cube-piece-2"></span>
+                  <span class="cube-piece cube-piece-3"></span>
+                  <span class="cube-piece cube-piece-4"></span>
+                </div>
+                <span
+                  class="text-xs font-medium tracking-wide text-slate-500 uppercase"
+                >
+                  Loading buckets…
+                </span>
+              </div>
+            </div>
 
             <ul v-else class="space-y-2">
               <li v-for="bucket in sortedBuckets" :key="bucket.id">
@@ -120,31 +172,36 @@
                     bucket.errorMessage === null ? selectBucket(bucket.id) : ''
                   "
                   :class="[
-                    'w-full flex items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition',
+                    'w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition',
                     selectedBucketId === bucket.id
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'hover:bg-gray-50 text-gray-700',
+                      ? 'bg-sky-50/80 text-sky-800 ring-1 ring-sky-100'
+                      : 'hover:bg-slate-50 text-slate-700',
                     bucket.errorMessage !== null
-                      ? 'text-red-500 cursor-not-allowed hover:bg-red-50'
+                      ? 'text-red-500 cursor-not-allowed hover:bg-red-50/80'
                       : '',
                   ]"
                 >
                   <img
-                    class="rounded size-8"
+                    class="rounded-lg shadow-sm size-8"
                     :src="bucket.cloudProvider.logoUrl"
                     alt=""
                   />
 
                   <div class="flex-1">
-                    <div class="flex justify-between font-medium">
-                      <h2 class="text-lg">
+                    <div
+                      class="flex items-baseline justify-between gap-2 font-medium text-left"
+                    >
+                      <h2 class="text-sm">
                         {{ bucket.errorMessage ?? bucket.name }}
                       </h2>
-                      <p v-if="bucket.errorMessage === null" class="text-sm">
+                      <p
+                        v-if="bucket.errorMessage === null"
+                        class="text-xs text-slate-600"
+                      >
                         {{ bucket.sizeHuman }}
                       </p>
                     </div>
-                    <div class="text-xs text-gray-500">
+                    <div class="mt-0.5 text-xs text-slate-500">
                       {{ bucket.cloudProvider.name }} ·
                       {{ bucket.organizationOrAccountName }} ·
                       {{ bucket.region }}
@@ -158,7 +215,7 @@
 
         <section
           v-if="selectedBucketId"
-          class="flex flex-col overflow-hidden bg-white border rounded-lg shadow-sm lg:col-span-2"
+          class="flex flex-col overflow-hidden bg-white/80 border border-slate-100 rounded-2xl shadow-sm backdrop-blur lg:col-span-2"
         >
           <file-explorer
             class="shrink-0"
@@ -173,41 +230,53 @@
           />
 
           <!-- Documents header -->
-          <div class="px-4 py-3 border-b shrink-0">
-            <h2 class="text-sm font-medium text-gray-700">Documents</h2>
+          <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0">
+            <h2
+              class="text-xs font-semibold tracking-wide text-slate-600 uppercase"
+            >
+              Documents
+            </h2>
           </div>
 
           <!-- Documents content (scrollable) -->
           <div class="flex-1 p-4 overflow-y-auto">
             <p
               v-if="loadingDocuments && documents.length === 0"
-              class="text-sm text-gray-500"
+              class="text-sm text-slate-500"
             >
               Loading documents…
             </p>
 
             <div v-if="documents.length" class="overflow-x-auto">
-              <table class="min-w-full text-sm">
+              <table class="min-w-full text-sm text-slate-700">
                 <thead>
-                  <tr class="text-left text-gray-500 border-b">
-                    <th class="py-2 font-medium">Key</th>
-                    <th class="py-2 font-medium">Size</th>
-                    <th class="py-2 font-medium">Last modified</th>
+                  <tr
+                    class="text-left text-slate-500 border-b border-slate-100 bg-slate-50/60"
+                  >
+                    <th class="py-2 text-xs font-semibold tracking-wide uppercase">
+                      Key
+                    </th>
+                    <th class="py-2 text-xs font-semibold tracking-wide uppercase">
+                      Size
+                    </th>
+                    <th class="py-2 text-xs font-semibold tracking-wide uppercase">
+                      Last modified
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
                     v-for="doc in documents"
                     :key="doc.name"
-                    class="border-b last:border-0 hover:bg-gray-50"
+                    class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
                   >
-                    <td class="py-2 font-mono text-xs text-gray-800">
+                    <td class="py-2 font-mono text-xs text-slate-800">
                       {{ doc.name }}
                     </td>
-                    <td class="py-2 text-gray-600">
+                    <td class="py-2 text-slate-600">
                       {{ doc.sizeHuman }}
                     </td>
-                    <td class="py-2 text-gray-600">
+                    <td class="py-2 text-slate-600">
                       {{ doc.lastModified ? format(doc.lastModified) : "" }}
                     </td>
                   </tr>
@@ -217,7 +286,7 @@
 
             <p
               v-if="!loadingDocuments && documents.length === 0"
-              class="text-sm text-gray-500"
+              class="text-sm text-slate-500"
             >
               No documents found.
             </p>
@@ -226,7 +295,7 @@
               <button
                 :disabled="loadingDocuments"
                 @click="loadDocuments()"
-                class="inline-flex items-center rounded-md border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                class="inline-flex items-center px-4 py-2 text-sm font-medium text-slate-700 bg-white/90 border border-slate-200 rounded-full shadow-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ loadingDocuments ? "Loading…" : "Load more" }}
               </button>
@@ -407,3 +476,49 @@ onMounted(() => {
   }
 });
 </script>
+
+<style scoped>
+.cube-grid {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.cube-piece {
+  border-radius: 0.375rem;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+  animation: cubePulse 1.1s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.cube-piece-1 {
+  animation-delay: 0s;
+}
+
+.cube-piece-2 {
+  animation-delay: 0.12s;
+}
+
+.cube-piece-3 {
+  animation-delay: 0.24s;
+}
+
+.cube-piece-4 {
+  animation-delay: 0.36s;
+}
+
+@keyframes cubePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+}
+</style>
