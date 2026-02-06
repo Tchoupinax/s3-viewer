@@ -1,5 +1,4 @@
 import { S3Client } from "@aws-sdk/client-s3";
-import { C } from "vue-router/dist/router-CWoNjPRp.mjs";
 import { Account } from "~/server/types/account";
 
 const REQUIRED_FIELDS = [
