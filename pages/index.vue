@@ -11,10 +11,10 @@
     </FileDisplaying>
 
     <div
-      class="flex flex-col h-full max-w-6xl p-4 mx-auto space-y-4 sm:p-6 lg:p-8"
+      class="flex flex-col h-full w-full max-w-[1600px] p-4 mx-auto space-y-4 sm:p-6 lg:p-8"
     >
       <header
-        class="flex items-start justify-between gap-6 px-5 py-4 bg-white/80 border border-white/60 rounded-2xl shadow-sm backdrop-blur-sm shrink-0"
+        class="flex items-start justify-between gap-6 px-5 py-4 border shadow-sm bg-white/80 border-white/60 rounded-2xl backdrop-blur-sm shrink-0"
       >
         <div>
           <h1 class="text-3xl font-semibold tracking-tight text-slate-900">
@@ -53,10 +53,10 @@
             <div
               v-for="n in 2"
               :key="n"
-              class="flex items-center gap-3 px-4 py-3 bg-white/70 border border-slate-100 rounded-xl shadow-sm"
+              class="flex items-center gap-3 px-4 py-3 border shadow-sm bg-white/70 border-slate-100 rounded-xl"
             >
               <div
-                class="w-9 h-9 rounded-lg bg-slate-100/90 animate-pulse"
+                class="rounded-lg w-9 h-9 bg-slate-100/90 animate-pulse"
               ></div>
 
               <div class="flex flex-col gap-1 leading-tight">
@@ -74,7 +74,7 @@
 
       <div
         v-if="errors.length"
-        class="p-4 mt-4 text-sm text-red-700 border border-red-100 rounded-xl shrink-0 bg-red-50/80 shadow-sm"
+        class="p-4 mt-4 text-sm text-red-700 border border-red-100 shadow-sm rounded-xl shrink-0 bg-red-50/80"
       >
         {{ errors }}
       </div>
@@ -83,13 +83,13 @@
         class="grid flex-1 grid-cols-1 gap-5 mt-6 overflow-hidden lg:grid-cols-3"
       >
         <section
-          class="flex flex-col overflow-hidden bg-white/80 border border-slate-100 rounded-2xl shadow-sm backdrop-blur"
+          class="flex flex-col overflow-hidden border shadow-sm bg-white/80 border-slate-100 rounded-2xl backdrop-blur"
         >
           <div
             class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
           >
             <h2
-              class="text-xs font-semibold tracking-wide text-slate-600 uppercase"
+              class="text-xs font-semibold tracking-wide uppercase text-slate-600"
             >
               Buckets ({{ buckets.length }})
             </h2>
@@ -150,7 +150,7 @@
               v-if="loadingBuckets"
               class="flex items-center justify-center h-full"
             >
-              <div class="cube-loader flex flex-col items-center gap-3">
+              <div class="flex flex-col items-center gap-3 cube-loader">
                 <div class="cube-grid">
                   <span class="cube-piece cube-piece-1"></span>
                   <span class="cube-piece cube-piece-2"></span>
@@ -158,7 +158,7 @@
                   <span class="cube-piece cube-piece-4"></span>
                 </div>
                 <span
-                  class="text-xs font-medium tracking-wide text-slate-500 uppercase"
+                  class="text-xs font-medium tracking-wide uppercase text-slate-500"
                 >
                   Loading buckets…
                 </span>
@@ -215,7 +215,7 @@
 
         <section
           v-if="selectedBucketId"
-          class="flex flex-col overflow-hidden bg-white/80 border border-slate-100 rounded-2xl shadow-sm backdrop-blur lg:col-span-2"
+          class="flex flex-col overflow-hidden border shadow-sm bg-white/80 border-slate-100 rounded-2xl backdrop-blur lg:col-span-2"
         >
           <file-explorer
             class="shrink-0"
@@ -232,7 +232,7 @@
           <!-- Documents header -->
           <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0">
             <h2
-              class="text-xs font-semibold tracking-wide text-slate-600 uppercase"
+              class="text-xs font-semibold tracking-wide uppercase text-slate-600"
             >
               Documents
             </h2>
@@ -251,7 +251,7 @@
               <table class="min-w-full text-sm text-slate-700">
                 <thead>
                   <tr
-                    class="text-left text-slate-500 border-b border-slate-100 bg-slate-50/60"
+                    class="text-left border-b text-slate-500 border-slate-100 bg-slate-50/60"
                   >
                     <th class="py-2 text-xs font-semibold tracking-wide uppercase">
                       Key
@@ -295,7 +295,7 @@
               <button
                 :disabled="loadingDocuments"
                 @click="loadDocuments()"
-                class="inline-flex items-center px-4 py-2 text-sm font-medium text-slate-700 bg-white/90 border border-slate-200 rounded-full shadow-sm hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center px-4 py-2 text-sm font-medium border rounded-full shadow-sm text-slate-700 bg-white/90 border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {{ loadingDocuments ? "Loading…" : "Load more" }}
               </button>
