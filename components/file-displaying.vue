@@ -76,6 +76,7 @@ export default {
       pdfUrl: null,
       selectedFileName: "",
       type: "",
+      _escapeHandler: null as ((e: KeyboardEvent) => void) | null,
     };
   },
   computed: {
@@ -111,7 +112,7 @@ export default {
       this.pdfUrl = URL.createObjectURL(pdfBlob);
     }
 
-    if (false && this.type !== "pdf") {
+    if (this.type !== "pdf") {
       const shiki = await getHighlighter({
         themes: ["nord", "dark-plus"],
         langs: processLangs(this.filename),
@@ -125,12 +126,17 @@ export default {
         lang: "",
         defaultColor: "light",
       });
+    }
 
-      document.addEventListener("keydown", (evt) => {
-        if (evt.key === "Escape") {
-          this.$emit("close");
-        }
-      });
+    this._escapeHandler = (evt: KeyboardEvent) => {
+      if (evt.key === "Escape") this.$emit("close");
+    };
+    document.addEventListener("keydown", this._escapeHandler);
+  },
+  
+  beforeUnmount() {
+    if (this._escapeHandler) {
+      document.removeEventListener("keydown", this._escapeHandler);
     }
   },
 };

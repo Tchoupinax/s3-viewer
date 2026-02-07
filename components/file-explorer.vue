@@ -1,21 +1,24 @@
 <template>
-  <div class="flex flex-col h-full bg-white border rounded-lg shadow-sm">
-    <div class="flex items-center justify-between px-4 py-3 border-b">
-      <div class="flex items-center gap-2 text-sm text-gray-700">
+  <div class="flex flex-col h-full">
+    <div
+      class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
+    >
+      <div class="flex items-center gap-2 text-sm text-slate-700 min-w-0">
         <button
           v-if="currentLevel > 0"
+          type="button"
           @click="back"
-          class="inline-flex items-center px-2 py-1 text-xs text-gray-700 border rounded-md hover:bg-gray-50"
+          class="shrink-0 inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-600 bg-white/90 border border-slate-200 rounded-full shadow-sm hover:bg-slate-50 transition"
         >
           Back
         </button>
 
-        <span class="font-medium truncate">
+        <span class="font-medium text-slate-800 truncate">
           {{ formattedDirectory }}
         </span>
       </div>
 
-      <div v-if="displayUploadButton">
+      <div v-if="displayUploadButton" class="shrink-0">
         <FormUploadButton
           @uploadFiles="($event) => emit('uploadFiles', $event)"
         />
@@ -25,7 +28,7 @@
     <div class="flex-1 p-4 overflow-auto">
       <div
         v-if="files?.length === 0"
-        class="mt-20 text-sm text-center text-gray-500"
+        class="mt-20 text-sm text-center text-slate-500"
       >
         No files found.
       </div>
@@ -36,10 +39,11 @@
           :key="file.fullPath"
         >
           <button
-            class="flex items-center justify-between w-full px-3 py-2 text-sm transition rounded-md hover:bg-gray-50"
+            type="button"
+            class="flex items-center justify-between w-full px-3 py-2 text-sm transition rounded-lg"
             :class="{
-              'bg-blue-50 text-blue-700': selectedIndex === index,
-              'text-gray-700': selectedIndex !== index,
+              'bg-sky-50/80 text-sky-800 ring-1 ring-sky-100': selectedIndex === index,
+              'hover:bg-slate-50 text-slate-700': selectedIndex !== index,
             }"
             @click="
               file.isFolder
@@ -48,39 +52,39 @@
             "
           >
             <!-- Name -->
-            <div class="flex items-center gap-2 truncate">
+            <div class="flex items-center gap-2 min-w-0 truncate">
               <IconFolder
                 v-if="file.isFolder"
-                class="text-gray-400 shrink-0"
+                class="text-amber-500/90 shrink-0 size-5"
               />
               <span
                 class="truncate"
-                :class="file.isFolder ? 'font-medium' : 'text-gray-500'"
+                :class="file.isFolder ? 'font-medium' : 'text-slate-600'"
               >
                 {{ file.name }}
               </span>
             </div>
 
             <!-- Meta -->
-            <div class="flex items-center gap-3 text-xs text-gray-500">
+            <div class="flex items-center gap-3 text-xs text-slate-500 shrink-0">
               <span v-if="file.lastModified">
                 {{ format(file.lastModified) }}
               </span>
 
-              <span>
+              <span class="font-variant-numeric tabular-nums">
                 {{ prettyBytes(file.size) }}
               </span>
 
               <span
                 v-if="file.isFolder"
-                class="rounded-md bg-gray-100 px-2 w-10 py-0.5 text-gray-600"
+                class="rounded-full bg-slate-200/80 px-2 py-0.5 text-slate-600 font-medium"
               >
                 {{ file.children?.length ?? 0 }}
               </span>
 
               <IconDownload
                 v-else
-                class="w-10 text-gray-400"
+                class="size-5 text-slate-400"
               />
             </div>
           </button>

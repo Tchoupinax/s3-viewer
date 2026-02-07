@@ -217,25 +217,53 @@
           v-if="selectedBucketId"
           class="flex flex-col overflow-hidden border shadow-sm bg-white/80 border-slate-100 rounded-2xl backdrop-blur lg:col-span-2"
         >
-          <file-explorer
-            class="shrink-0"
-            currentDirectory="<root>"
-            :currentLevel="currentIndexes.length"
-            :files="currentFiles"
-            :filesCount="documentsCount"
-            @enterDirectory="handleDirectoryEntered"
-            @leaveDirectory="handleDirectoryLeft"
-            :displayUploadButton="false"
-            @openFile="(filename) => openFile(filename)"
-          />
-
-          <!-- Documents header -->
-          <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0">
+          <!-- Documents header with List/Tree toggle -->
+          <div
+            class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
+          >
             <h2
               class="text-xs font-semibold tracking-wide uppercase text-slate-600"
             >
               Documents
             </h2>
+
+            <div
+              class="flex items-center gap-1 p-0.5 bg-slate-100 rounded-full"
+            >
+              <button
+                :disabled="loadingDocuments || !documents.length"
+                type="button"
+                :class="[
+                  'px-3 py-1.5 text-xs rounded-full transition',
+                  documentsViewMode === 'list'
+                    ? 'bg-white shadow-sm text-slate-900'
+                    : 'text-slate-500',
+                  loadingDocuments || !documents.length
+                    ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                    : 'hover:text-slate-700 hover:bg-white',
+                ]"
+                @click="documentsViewMode = 'list'"
+              >
+                File Explorer
+              </button>
+
+              <button
+                :disabled="loadingDocuments || !documents.length"
+                type="button"
+                :class="[
+                  'px-3 py-1.5 text-xs rounded-full transition',
+                  documentsViewMode === 'tree'
+                    ? 'bg-white shadow-sm text-slate-900'
+                    : 'text-slate-500',
+                  loadingDocuments || !documents.length
+                    ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                    : 'hover:text-slate-700 hover:bg-white',
+                ]"
+                @click="documentsViewMode = 'tree'"
+              >
+                Tree
+              </button>
+            </div>
           </div>
 
           <!-- Documents content (scrollable) -->
@@ -247,59 +275,48 @@
               Loading documents…
             </p>
 
-            <div v-if="documents.length" class="overflow-x-auto">
-              <table class="min-w-full text-sm text-slate-700">
-                <thead>
-                  <tr
-                    class="text-left border-b text-slate-500 border-slate-100 bg-slate-50/60"
-                  >
-                    <th class="py-2 text-xs font-semibold tracking-wide uppercase">
-                      Key
-                    </th>
-                    <th class="py-2 text-xs font-semibold tracking-wide uppercase">
-                      Size
-                    </th>
-                    <th class="py-2 text-xs font-semibold tracking-wide uppercase">
-                      Last modified
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="doc in documents"
-                    :key="doc.name"
-                    class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
-                  >
-                    <td class="py-2 font-mono text-xs text-slate-800">
-                      {{ doc.name }}
-                    </td>
-                    <td class="py-2 text-slate-600">
-                      {{ doc.sizeHuman }}
-                    </td>
-                    <td class="py-2 text-slate-600">
-                      {{ doc.lastModified ? format(doc.lastModified) : "" }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <template v-if="documentsViewMode === 'list'">
+              <file-explorer
+                class="shrink-0"
+                currentDirectory="<root>"
+                :currentLevel="currentIndexes.length"
+                :files="currentFiles"
+                :filesCount="documentsCount"
+                @enterDirectory="handleDirectoryEntered"
+                @leaveDirectory="handleDirectoryLeft"
+                :displayUploadButton="false"
+                @openFile="(filename) => openFile(filename)"
+              />
+            </template>
+
+            <template
+              v-else-if="documentsViewMode === 'tree' && documents.length"
+            >
+              <div class="tree-view">
+                <div
+                  v-for="node in documents"
+                  :key="node.fullPath"
+                  class="tree-view-root"
+                >
+                  <DocumentsTreeNode
+                    :node="node"
+                    :collapsed-paths="treeCollapsedPaths"
+                    :format-size="formatSize"
+                    :format-date="format"
+                    :count-files="countFilesInNode"
+                    @toggle="toggleTreePath"
+                    @open-file="openFile"
+                  />
+                </div>
+              </div>
+            </template>
 
             <p
-              v-if="!loadingDocuments && documents.length === 0"
+              v-else-if="documentsViewMode === 'tree' && !documents.length"
               class="text-sm text-slate-500"
             >
-              No documents found.
+              No documents to show in tree.
             </p>
-
-            <div class="mt-4">
-              <button
-                :disabled="loadingDocuments"
-                @click="loadDocuments()"
-                class="inline-flex items-center px-4 py-2 text-sm font-medium border rounded-full shadow-sm text-slate-700 bg-white/90 border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {{ loadingDocuments ? "Loading…" : "Load more" }}
-              </button>
-            </div>
           </div>
         </section>
       </div>
@@ -310,8 +327,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { format } from "timeago.js";
+import prettyBytes from "pretty-bytes";
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { S3ViewerDocument } from "~/server/types/document";
+import type { FileNode } from "~/server/types/file-node";
 import { match } from "ts-pattern";
 import {
   extractGenerateBucketIdentity,
@@ -344,8 +363,41 @@ const stats = ref();
 const loadingBuckets = ref(false);
 const loadingDocuments = ref(false);
 const errors = ref<Array<string>>([]);
+const documentsViewMode = ref<"list" | "tree">("tree");
+const treeCollapsedPaths = ref<Set<string>>(new Set());
 
 const PAGE_SIZE = 20;
+
+function formatSize(size: number): string {
+  return prettyBytes(size ?? 0);
+}
+
+function countFilesInNode(node: FileNode): number {
+  if (!node.isFolder) return 1;
+  return (node.children ?? []).reduce(
+    (sum, child) => sum + countFilesInNode(child),
+    0,
+  );
+}
+
+function getAllFolderPaths(nodes: FileNode[]): string[] {
+  const paths: string[] = [];
+  for (const node of nodes) {
+    if (node.isFolder) {
+      paths.push(node.fullPath);
+      if (node.children?.length)
+        paths.push(...getAllFolderPaths(node.children));
+    }
+  }
+  return paths;
+}
+
+function toggleTreePath(fullPath: string) {
+  const next = new Set(treeCollapsedPaths.value);
+  if (next.has(fullPath)) next.delete(fullPath);
+  else next.add(fullPath);
+  treeCollapsedPaths.value = next;
+}
 
 const sortedBuckets = computed(() =>
   buckets.value.toSorted((a, b) =>
@@ -384,6 +436,9 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
     documents.value = res.data.files;
     currentFiles.value = res.data.files ?? [];
     documentsCount.value = res.data.filesCount;
+    treeCollapsedPaths.value = new Set(
+      getAllFolderPaths((res.data.files ?? []) as FileNode[]),
+    );
   } finally {
     loadingBuckets.value = false;
     $router.replace({ query: { ...$route.query, bin: bucketIdentityNumber } });
@@ -433,9 +488,13 @@ const handleDirectoryLeft = () => {
   if (currentIndexes.value.length === 1) {
     currentFiles.value = documents.value ?? [];
   } else {
-    let tempFiles = documents.value;
-    for (let i = 0; i < currentIndexes.value.length - 1; i++) {
-      tempFiles = tempFiles[currentIndexes.value[i]].children;
+    let tempFiles = documents.value ?? [];
+    const indexes = currentIndexes.value;
+    for (let i = 0; i < indexes.length - 1; i++) {
+      const node = tempFiles?.[indexes[i]];
+      const next = node?.children;
+      if (next == null) break;
+      tempFiles = next;
     }
     currentFiles.value = tempFiles ?? [];
   }
@@ -478,6 +537,18 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.tree-view {
+  padding: 0.125rem 0;
+}
+
+.tree-view-root {
+  margin-bottom: 0.125rem;
+}
+
+.tree-view-root:last-child {
+  margin-bottom: 0;
+}
+
 .cube-grid {
   width: 2.5rem;
   height: 2.5rem;
