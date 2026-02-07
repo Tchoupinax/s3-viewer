@@ -42,6 +42,9 @@
       </span>
 
       <span class="tree-node-meta">
+        <span v-if="!node.isFolder && node.lastModified" class="tree-node-date">
+          {{ formatDate(node.lastModified) }}
+        </span>
         <span class="tree-node-size">{{ formatSize(node.size) }}</span>
         <span
           v-if="node.isFolder"
@@ -59,6 +62,7 @@
         :node="child"
         :collapsed-paths="props.collapsedPaths"
         :format-size="formatSize"
+        :format-date="formatDate"
         :count-files="countFiles"
         @toggle="emit('toggle', $event)"
         @open-file="emit('open-file', $event)"
@@ -76,6 +80,7 @@ const props = defineProps<{
   node: FileNode;
   collapsedPaths: Set<string>;
   formatSize: (size: number) => string;
+  formatDate: (date: Date | null) => string;
   countFiles: (node: FileNode) => number;
 }>();
 
@@ -179,6 +184,10 @@ function onRowClick() {
   gap: 0.5rem;
   font-size: 0.75rem;
   color: rgb(100 116 139);
+}
+
+.tree-node-date {
+  min-width: 4rem;
 }
 
 .tree-node-size {

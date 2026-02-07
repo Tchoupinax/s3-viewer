@@ -302,6 +302,7 @@
                     :node="node"
                     :collapsed-paths="treeCollapsedPaths"
                     :format-size="formatSize"
+                    :format-date="format"
                     :count-files="countFilesInNode"
                     @toggle="toggleTreePath"
                     @open-file="openFile"
@@ -487,9 +488,13 @@ const handleDirectoryLeft = () => {
   if (currentIndexes.value.length === 1) {
     currentFiles.value = documents.value ?? [];
   } else {
-    let tempFiles = documents.value;
-    for (let i = 0; i < currentIndexes.value.length - 1; i++) {
-      tempFiles = tempFiles[currentIndexes.value[i]].children;
+    let tempFiles = documents.value ?? [];
+    const indexes = currentIndexes.value;
+    for (let i = 0; i < indexes.length - 1; i++) {
+      const node = tempFiles?.[indexes[i]];
+      const next = node?.children;
+      if (next == null) break;
+      tempFiles = next;
     }
     currentFiles.value = tempFiles ?? [];
   }
