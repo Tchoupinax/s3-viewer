@@ -59,14 +59,20 @@ export default defineEventHandler(
       status: "OK",
       data: {
         buckets,
-        stats: Object.keys(stats).map((key) => ({
-          cloudProvider: {
-            name: key || null,
-            logoUrl: getCloudProviderLogoUrl(key),
-          },
-          size: stats[key],
-          sizeHuman: stats[key] ? prettyBytes(stats[key]) : "0",
-        })),
+        stats: Object.keys(stats)
+          .map((key) => ({
+            cloudProvider: {
+              name: key || null,
+              logoUrl: getCloudProviderLogoUrl(key),
+            },
+            size: stats[key],
+            sizeHuman: stats[key] ? prettyBytes(stats[key]) : "0",
+          }))
+          .sort((a, b) =>
+            (a.cloudProvider?.name ?? "") < (b.cloudProvider?.name ?? "")
+              ? -1
+              : 1,
+          ),
       },
     };
   },
@@ -101,10 +107,10 @@ export async function mapToS3ViewerBuckets({
   errorMessage: string | null;
 }): Promise<Array<S3ViewerBucket>> {
   async function mapToS3ViewerBucket(bucket: Bucket): Promise<S3ViewerBucket> {
-    const bucketSize =
+    const { size: bucketSize, count: filesCount } =
       errorMessage === null
-        ? await getBucketSize(connection, bucket.Name ?? "")
-        : 0;
+        ? await getBucketSizeAndCount(connection, bucket.Name ?? "")
+        : { size: 0, count: 0 };
 
     return {
       id: generateBucketIdentityNumber({
@@ -123,6 +129,7 @@ export async function mapToS3ViewerBuckets({
       accountId,
       size: bucketSize,
       sizeHuman: prettyBytes(bucketSize),
+      filesCount,
       errorMessage,
     };
   }
@@ -146,6 +153,7 @@ export async function mapToS3ViewerBuckets({
         name: "This",
         size: 0,
         sizeHuman: "0",
+        filesCount: 0,
         createdAt: null,
       },
     ];
@@ -169,11 +177,12 @@ export async function extractCloudProviderName(
     .otherwise(() => "AWS");
 }
 
-async function getBucketSize(
+async function getBucketSizeAndCount(
   connection: S3Client,
   bucketName: string,
-): Promise<number> {
+): Promise<{ size: number; count: number }> {
   let totalSize = 0;
+  let totalCount = 0;
   let continuationToken: string | undefined;
 
   try {
@@ -185,6 +194,7 @@ async function getBucketSize(
         }),
       );
 
+      totalCount += res.KeyCount ?? res.Contents?.length ?? 0;
       if (res.Contents) {
         for (const object of res.Contents) {
           totalSize += object.Size ?? 0;
@@ -194,9 +204,9 @@ async function getBucketSize(
       continuationToken = res.NextContinuationToken;
     } while (continuationToken);
 
-    return totalSize;
+    return { size: totalSize, count: totalCount };
   } catch (err) {
-    return 0;
+    return { size: 0, count: 0 };
   }
 }
 

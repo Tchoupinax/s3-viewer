@@ -8,6 +8,7 @@ export type S3ViewerBucket = {
   region: string | null;
   size: number;
   sizeHuman: string;
+  filesCount: number;
   errorMessage: string | null;
 };
 

@@ -187,24 +187,34 @@
                     alt=""
                   />
 
-                  <div class="flex-1">
+                  <div class="flex-1 min-w-0">
                     <div
-                      class="flex items-baseline justify-between gap-2 font-medium text-left"
+                      class="relative flex items-stretch justify-between gap-2 font-medium text-left"
                     >
-                      <h2 class="text-sm">
-                        {{ bucket.errorMessage ?? bucket.name }}
-                      </h2>
-                      <p
+                      <div class="flex-1 min-w-0">
+                        <h2 class="text-sm truncate">
+                          {{ bucket.errorMessage ?? bucket.name }}
+                        </h2>
+                        <div class="mt-0.5 text-xs text-slate-500">
+                          {{ bucket.cloudProvider.name }} ·
+                          {{ bucket.organizationOrAccountName }} ·
+                          {{ bucket.region }}
+                        </div>
+                      </div>
+
+                      <div
                         v-if="bucket.errorMessage === null"
-                        class="text-xs text-slate-600"
+                        class="relative flex flex-col self-stretch justify-between text-right shrink-0"
                       >
-                        {{ bucket.sizeHuman }}
-                      </p>
-                    </div>
-                    <div class="mt-0.5 text-xs text-slate-500">
-                      {{ bucket.cloudProvider.name }} ·
-                      {{ bucket.organizationOrAccountName }} ·
-                      {{ bucket.region }}
+                        <p class="text-xs text-slate-600">
+                          {{ bucket.sizeHuman }}
+                        </p>
+
+                        <p class="text-xs text-slate-600/50">
+                          {{ bucket.filesCount }}
+                          {{ bucket.filesCount === 1 ? "file" : "files" }}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </button>
