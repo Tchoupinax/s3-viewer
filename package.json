@@ -10,7 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.993.0",
+    "@aws-sdk/client-s3": "3.994.0",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "1.15.1",
     "@nuxt/hints": "1.0.0-alpha.7",
@@ -23,7 +23,7 @@
     "timeago.js": "4.0.2",
     "ts-pattern": "5.9.0",
     "vue": "3.5.28",
-    "vue-router": "5.0.2"
+    "vue-router": "5.0.3"
   },
   "devDependencies": {
     "@types/node": "25.3.0",
