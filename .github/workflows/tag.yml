@@ -7,7 +7,7 @@ on:
 
 jobs:
   docker:
-    name: Build offcial container 🐳
+    name: Build official container 🐳
     runs-on: ubuntu-latest
     steps:
     - name: Set up QEMU
@@ -31,14 +31,11 @@ jobs:
           tchoupinax/s3-viewer
         flavor: latest=true
         tags: |
-          type=ref,event=branch
-          type=ref,event=pr
           type=semver,pattern=v{{version}}
 
     - name: Build and push
       uses: docker/build-push-action@v6
       with:
-        context: .
         platforms: linux/amd64,linux/arm64
         push: true
         tags: ${{ steps.meta.outputs.tags }}
