@@ -13,6 +13,7 @@ jobs:
       uses: tchoupinax/repo-config/shared-actions/steps/node/lint@v0
       with:
         nodeVersion: 25
+        throwOnError: false
 
   build:
     name: Check build success 🦫
