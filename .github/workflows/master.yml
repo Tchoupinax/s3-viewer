@@ -40,7 +40,9 @@ jobs:
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: tchoupinax/s3-prometheus-exporter
+        images: |
+          ghcr.io/tchoupinax/s3-viewer
+          tchoupinax/s3-viewer
         flavor: latest=true
         tags: |
           type=raw,value=latest-${{ steps.date.outputs.date }}
