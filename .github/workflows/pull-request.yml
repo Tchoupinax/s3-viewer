@@ -1,0 +1,50 @@
+name: Pull request checks 🔎
+
+on:
+  pull_request:
+
+
+jobs:
+  lint:
+    name: Check code quality 🫆
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check code quality 🫆
+      uses: tchoupinax/repo-config/shared-actions/steps/node/lint@v0
+      with:
+        nodeVersion: 25
+        pnpmVersion: 10.30.1
+
+  unit-tests:
+    name: Unit tests 🐏
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        nodeVersion: [ "24.x", "25.x" ]
+    steps:
+    - name: Unit tests 🐏
+      uses: tchoupinax/repo-config/shared-actions/steps/node/test-unit@v0
+      with:
+        nodeVersion: ${{ matrix.nodeVersion }}
+        command: "test"
+        pnpmVersion: 10.30.1
+
+  build:
+    name: Check build success 🦫
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check build success 🦫
+      uses: tchoupinax/repo-config/shared-actions/steps/node/build@v0
+      with:
+        nodeVersion: 25
+        pnpmVersion: 10.30.1
+
+  labels:
+    name: Autodetect labels 🔍
+    runs-on: ubuntu-latest
+    steps:
+    - name: Autodetect labels 🔍
+      uses: tchoupinax/repo-config/shared-actions/steps/dx/automatically-apply-labels@v0
+      with:
+        appId: ${{ secrets.DEPLOY_APP_ID }}
+        privateKey: ${{ secrets.DEPLOY_APP_KEY }}
