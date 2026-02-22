@@ -3,24 +3,27 @@
     <div
       class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
     >
-      <div class="flex items-center gap-2 text-sm text-slate-700 min-w-0">
+      <div class="flex items-center min-w-0 gap-2 text-sm text-slate-700">
         <button
           v-if="currentLevel > 0"
           type="button"
-          @click="back"
           class="shrink-0 inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-600 bg-white/90 border border-slate-200 rounded-full shadow-sm hover:bg-slate-50 transition"
+          @click="back"
         >
           Back
         </button>
 
-        <span class="font-medium text-slate-800 truncate">
+        <span class="font-medium truncate text-slate-800">
           {{ formattedDirectory }}
         </span>
       </div>
 
-      <div v-if="displayUploadButton" class="shrink-0">
+      <div
+        v-if="displayUploadButton"
+        class="shrink-0"
+      >
         <FormUploadButton
-          @uploadFiles="($event) => emit('uploadFiles', $event)"
+          @upload-files="($event) => emit('uploadFiles', $event)"
         />
       </div>
     </div>
@@ -33,7 +36,10 @@
         No files found.
       </div>
 
-      <ul v-else class="space-y-1">
+      <ul
+        v-else
+        class="space-y-1"
+      >
         <li
           v-for="(file, index) in sortedFiles"
           :key="file.fullPath"
@@ -52,7 +58,7 @@
             "
           >
             <!-- Name -->
-            <div class="flex items-center gap-2 min-w-0 truncate">
+            <div class="flex items-center min-w-0 gap-2 truncate">
               <IconFolder
                 v-if="file.isFolder"
                 class="text-amber-500/90 shrink-0 size-5"
@@ -95,9 +101,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type PropType } from "vue";
 import prettyBytes from "pretty-bytes";
 import { format } from "timeago.js";
+import { ref, computed, watch, type PropType } from "vue";
 
 const $router = useRouter();
 const $route = useRoute();
@@ -119,7 +125,7 @@ const props = defineProps({
 const selectedIndex = ref(0);
 
 const formattedDirectory = computed(() =>
-  props.currentDirectory.split("/").join(" / ")
+  props.currentDirectory.split("/").join(" / "),
 );
 const sortedFiles = computed(() => {
   return [...props.files].sort((a, b) => {
@@ -152,18 +158,19 @@ const back = () => {
 
 const handleKeyDown = (event: KeyboardEvent) => {
   if (
-    props.currentLevel > 0 &&
-    ["Backspace", "ArrowLeft"].includes(event.code)
+    props.currentLevel > 0
+    && ["Backspace", "ArrowLeft"].includes(event.code)
   ) {
     back();
   }
 
   if (event.code === "ArrowUp" && selectedIndex.value > 0) {
     selectedIndex.value--;
-  } else if (
-    event.code === "ArrowDown" &&
-    props?.files &&
-    selectedIndex.value < props?.files?.length - 1
+  }
+  else if (
+    event.code === "ArrowDown"
+    && props?.files
+    && selectedIndex.value < props?.files?.length - 1
   ) {
     selectedIndex.value++;
   }
@@ -185,7 +192,7 @@ watch(
   () => props.files,
   () => {
     selectedIndex.value = 0;
-  }
+  },
 );
 
 onMounted(() => {

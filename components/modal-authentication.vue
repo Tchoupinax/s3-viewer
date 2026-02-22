@@ -6,8 +6,13 @@
   >
     <div class="p-6 bg-white rounded-lg shadow-xl w-96">
       <div class="flex items-center justify-between pb-2 border-b">
-        <h2 class="text-xl font-semibold text-gray-700">Authentication</h2>
-        <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600">
+        <h2 class="text-xl font-semibold text-gray-700">
+          Authentication
+        </h2>
+        <button
+          id="closeModalBtn"
+          class="text-gray-400 hover:text-gray-600"
+        >
           &times;
         </button>
       </div>

@@ -5,7 +5,7 @@
     <FileDisplaying
       v-if="displayedFile"
       :filename="displayedFile.filename"
-      :bucketId="displayedFile.bucketId"
+      :bucket-id="displayedFile.bucketId"
       @close="displayedFile = null"
     >
     </FileDisplaying>
@@ -99,11 +99,6 @@
             >
               <button
                 :disabled="loadingBuckets"
-                @click="
-                  sortBy === 'name'
-                    ? (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')
-                    : ((sortBy = 'name'), (sortDirection = 'asc'))
-                "
                 :class="[
                   'px-3 py-1.5 text-xs rounded-full transition',
                   sortBy === 'name'
@@ -113,20 +108,23 @@
                     ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
                     : 'hover:text-slate-700 hover:bg-white',
                 ]"
+                @click="
+                  sortBy === 'name'
+                    ? (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')
+                    : ((sortBy = 'name'), (sortDirection = 'asc'))
+                "
               >
                 Name
-                <span v-if="sortBy === 'name'" class="ml-1 text-[10px]">
+                <span
+                  v-if="sortBy === 'name'"
+                  class="ml-1 text-[10px]"
+                >
                   {{ sortDirection === "asc" ? "↑" : "↓" }}
                 </span>
               </button>
 
               <button
                 :disabled="loadingBuckets"
-                @click="
-                  sortBy === 'size'
-                    ? (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')
-                    : ((sortBy = 'size'), (sortDirection = 'asc'))
-                "
                 :class="[
                   'px-3 py-1.5 text-xs rounded-full transition',
                   sortBy === 'size'
@@ -136,9 +134,17 @@
                     ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
                     : 'hover:text-slate-700 hover:bg-white',
                 ]"
+                @click="
+                  sortBy === 'size'
+                    ? (sortDirection = sortDirection === 'asc' ? 'desc' : 'asc')
+                    : ((sortBy = 'size'), (sortDirection = 'asc'))
+                "
               >
                 Size
-                <span v-if="sortBy === 'size'" class="ml-1 text-[10px]">
+                <span
+                  v-if="sortBy === 'size'"
+                  class="ml-1 text-[10px]"
+                >
                   {{ sortDirection === "asc" ? "↑" : "↓" }}
                 </span>
               </button>
@@ -165,12 +171,15 @@
               </div>
             </div>
 
-            <ul v-else class="space-y-2">
-              <li v-for="bucket in sortedBuckets" :key="bucket.id">
+            <ul
+              v-else
+              class="space-y-2"
+            >
+              <li
+                v-for="bucket in sortedBuckets"
+                :key="bucket.id"
+              >
                 <button
-                  @click="
-                    bucket.errorMessage === null ? selectBucket(bucket.id) : ''
-                  "
                   :class="[
                     'w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition',
                     selectedBucketId === bucket.id
@@ -180,6 +189,9 @@
                       ? 'text-red-500 cursor-not-allowed hover:bg-red-50/80'
                       : '',
                   ]"
+                  @click="
+                    bucket.errorMessage === null ? selectBucket(bucket.id) : ''
+                  "
                 >
                   <img
                     class="rounded-lg shadow-sm size-8"
@@ -288,14 +300,14 @@
             <template v-if="documentsViewMode === 'list'">
               <file-explorer
                 class="shrink-0"
-                currentDirectory="<root>"
-                :currentLevel="currentIndexes.length"
+                current-directory="<root>"
+                :current-level="currentIndexes.length"
                 :files="currentFiles"
-                :filesCount="documentsCount"
-                @enterDirectory="handleDirectoryEntered"
-                @leaveDirectory="handleDirectoryLeft"
-                :displayUploadButton="false"
-                @openFile="(filename) => openFile(filename)"
+                :files-count="documentsCount"
+                :display-upload-button="false"
+                @enter-directory="handleDirectoryEntered"
+                @leave-directory="handleDirectoryLeft"
+                @open-file="(filename) => openFile(filename)"
               />
             </template>
 
@@ -335,13 +347,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { format } from "timeago.js";
 import prettyBytes from "pretty-bytes";
+import { format } from "timeago.js";
+import { match } from "ts-pattern";
+import { ref, onMounted } from "vue";
+
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { S3ViewerDocument } from "~/server/types/document";
 import type { FileNode } from "~/server/types/file-node";
-import { match } from "ts-pattern";
+
 import {
   extractGenerateBucketIdentity,
   type BucketIdentityNumber,
@@ -352,8 +366,8 @@ const $route = useRoute();
 
 useHead({
   title:
-    window?.location &&
-    new URL(window?.location?.toString()).hostname === "localhost"
+    window?.location
+    && new URL(window?.location?.toString()).hostname === "localhost"
       ? "🚀 DEV 🚀 S3 Viewer"
       : "S3 Viewer",
 });
@@ -433,7 +447,8 @@ const loadBuckets = async () => {
     const res = await $fetch("/api/buckets");
     buckets.value = res.data.buckets;
     stats.value = res.data.stats;
-  } finally {
+  }
+  finally {
     loadingBuckets.value = false;
   }
 };
@@ -449,7 +464,8 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
     treeCollapsedPaths.value = new Set(
       getAllFolderPaths((res.data.files ?? []) as FileNode[]),
     );
-  } finally {
+  }
+  finally {
     loadingBuckets.value = false;
     $router.replace({ query: { ...$route.query, bin: bucketIdentityNumber } });
   }
@@ -476,16 +492,18 @@ const loadDocuments = async (reset = false) => {
     documents.value = reset ? res.items : [...documents.value, ...res.items];
 
     nextCursor.value = res.nextCursor;
-  } catch (e: any) {
+  }
+  catch (e: any) {
     error.value = e?.statusMessage || "Failed to load documents";
-  } finally {
+  }
+  finally {
     loadingDocuments.value = false;
   }
 };
 
 const handleDirectoryEntered = (folderName: string) => {
   const folderIndex = currentFiles.value.findIndex(
-    (f) => f.name === folderName,
+    f => f.name === folderName,
   );
   const nodeName = currentFiles.value[folderIndex].name;
   currentFiles.value = currentFiles.value[folderIndex]?.children ?? [];
@@ -497,7 +515,8 @@ const handleDirectoryEntered = (folderName: string) => {
 const handleDirectoryLeft = () => {
   if (currentIndexes.value.length === 1) {
     currentFiles.value = documents.value ?? [];
-  } else {
+  }
+  else {
     let tempFiles = documents.value ?? [];
     const indexes = currentIndexes.value;
     for (let i = 0; i < indexes.length - 1; i++) {
@@ -536,7 +555,7 @@ onMounted(() => {
       const parts = localCurrentDirectory.split("/");
       for (const part of parts.slice(1)) {
         const folderIndex = currentFiles.value.findIndex(
-          (f) => f.name === part,
+          f => f.name === part,
         );
         currentFiles.value = currentFiles.value[folderIndex]?.children ?? [];
         currentIndexes.value.push(folderIndex);

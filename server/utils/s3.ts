@@ -1,5 +1,6 @@
 import { S3Client } from "@aws-sdk/client-s3";
-import { Account } from "~/server/types/account";
+
+import type { Account } from "~/server/types/account";
 
 const REQUIRED_FIELDS = [
   "ACCESS_KEY",

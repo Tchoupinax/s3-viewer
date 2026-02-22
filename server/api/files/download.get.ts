@@ -1,9 +1,8 @@
 import { GetObjectCommand } from "@aws-sdk/client-s3";
-import {
-  BucketIdentityNumber,
-  extractGenerateBucketIdentity,
-} from "~/functions/bucket-identity-number";
-import { store } from "~/server/api/repositories/in-memory-store";
+
+import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
+
+import { extractGenerateBucketIdentity } from "~/functions/bucket-identity-number";
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
@@ -19,7 +18,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const connection = connections.find(
-    (connection) => connection.id === accountId,
+    connection => connection.id === accountId,
   );
 
   const response = await connection?.connection.send(

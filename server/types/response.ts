@@ -1,4 +1,4 @@
-type S3ViewerResponse<T> = {
+export type S3ViewerResponse<T> = {
   data: T;
   status: "OK" | "KO";
 };
