@@ -1,4 +1,4 @@
-import { S3ViewerDocument } from "~/server/types/document";
+import type { S3ViewerDocument } from "~/server/types/document";
 
 export type FileNode = {
   children?: Array<FileNode>;
@@ -23,7 +23,7 @@ export function buildFileTree(
     if (parts) {
       for (const [index, part] of parts.entries()) {
         currentPath = currentPath ? `${currentPath}/${part}` : part;
-        let existingNode = currentLevel.find((node) => node.name === part);
+        let existingNode = currentLevel.find(node => node.name === part);
 
         if (!existingNode) {
           existingNode = {

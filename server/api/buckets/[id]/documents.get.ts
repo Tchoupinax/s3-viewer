@@ -1,12 +1,17 @@
 import { ListObjectsV2Command } from "@aws-sdk/client-s3";
-import { connections } from "~/server/utils/s3";
 import prettyBytes from "pretty-bytes";
-import { S3ViewerDocument } from "~/server/types/document";
-import { buildFileTree, FileNode } from "~/server/types/file-node";
+
+import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
+import type { S3ViewerDocument } from "~/server/types/document";
+import type { FileNode } from "~/server/types/file-node";
+
 import {
-  BucketIdentityNumber,
   extractGenerateBucketIdentity,
 } from "~/functions/bucket-identity-number";
+import { buildFileTree } from "~/server/types/file-node";
+import { connections } from "~/server/utils/s3";
+
+import type { S3ViewerResponse } from "../../../types/response";
 
 export default defineEventHandler(
   async (
@@ -27,11 +32,11 @@ export default defineEventHandler(
     const limit = 3000;
     const cursor = query.cursor as string | undefined;
 
-    const { bucketName, accountId } =
-      extractGenerateBucketIdentity(bucketIdentityNumber);
+    const { bucketName, accountId }
+      = extractGenerateBucketIdentity(bucketIdentityNumber);
 
     const connection = connections.find(
-      (connection) => connection.id === accountId,
+      connection => connection.id === accountId,
     );
 
     if (!connection || !bucketName) {
@@ -50,7 +55,7 @@ export default defineEventHandler(
     );
 
     const documents: Array<S3ViewerDocument> = (response?.Contents || []).map(
-      (obj) =>
+      obj =>
         ({
           name: obj.Key ?? "",
           size: obj.Size ?? 0,

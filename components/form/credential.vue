@@ -6,9 +6,9 @@
       <div class="form-group">
         <label for="name">Name</label>
         <input
-          type="text"
           id="name"
           v-model="credential.name"
+          type="text"
           required
           placeholder="Enter credential name"
         />
@@ -17,16 +17,21 @@
       <!-- Color Field -->
       <div class="form-group">
         <label for="color">Color</label>
-        <input type="color" id="color" v-model="credential.color" required />
+        <input
+          id="color"
+          v-model="credential.color"
+          type="color"
+          required
+        />
       </div>
 
       <!-- Optional Fields -->
       <div class="form-group">
         <label for="s3AccessKey">S3 Access Key</label>
         <input
-          type="text"
           id="s3AccessKey"
           v-model="credential.s3AccessKey"
+          type="text"
           placeholder="Enter S3 Access Key"
         />
       </div>
@@ -34,9 +39,9 @@
       <div class="form-group">
         <label for="s3Bucket">S3 Bucket</label>
         <input
-          type="text"
           id="s3Bucket"
           v-model="credential.s3Bucket"
+          type="text"
           placeholder="Enter S3 Bucket"
         />
       </div>
@@ -44,9 +49,9 @@
       <div class="form-group">
         <label for="s3Endpoint">S3 Endpoint</label>
         <input
-          type="text"
           id="s3Endpoint"
           v-model="credential.s3Endpoint"
+          type="text"
           placeholder="Enter S3 Endpoint"
         />
       </div>
@@ -54,9 +59,9 @@
       <div class="form-group">
         <label for="s3Region">S3 Region</label>
         <input
-          type="text"
           id="s3Region"
           v-model="credential.s3Region"
+          type="text"
           placeholder="Enter S3 Region"
         />
       </div>
@@ -64,22 +69,23 @@
       <div class="form-group">
         <label for="s3SecretKey">S3 Secret Key</label>
         <input
-          type="password"
           id="s3SecretKey"
           v-model="credential.s3SecretKey"
+          type="password"
           placeholder="Enter S3 Secret Key"
         />
       </div>
 
       <!-- Submit Button -->
-      <button type="submit">{{ isEdit ? "Update" : "Create" }}</button>
+      <button type="submit">
+        {{ isEdit ? "Update" : "Create" }}
+      </button>
     </form>
   </div>
 </template>
 
 <script lang="ts">
 export default {
-  emits: ["create-credential", "update-credential"],
   props: {
     initialData: {
       type: Object,
@@ -99,16 +105,23 @@ export default {
       default: false,
     },
   },
+  emits: ["create-credential", "update-credential"],
   data() {
     return {
       credential: { ...this.initialData },
     };
   },
+  mounted() {
+    if (!this.isEdit && !this.credential.color) {
+      this.credential.color = this.getRandomColor();
+    }
+  },
   methods: {
     handleSubmit() {
       if (this.isEdit) {
         this.$emit("update-credential", this.credential);
-      } else {
+      }
+      else {
         this.$emit("create-credential", this.credential);
       }
     },
@@ -117,11 +130,6 @@ export default {
         .toString(16)
         .padStart(6, "0")}`;
     },
-  },
-  mounted() {
-    if (!this.isEdit && !this.credential.color) {
-      this.credential.color = this.getRandomColor();
-    }
   },
 };
 </script>

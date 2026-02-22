@@ -21,12 +21,10 @@ export function extractGenerateBucketIdentity(
 }
 
 function base64UrlEncode(str: string): string {
-  const base64 =
-    typeof btoa === "function"
-      ? // Browser
-        btoa(String.fromCharCode(...new TextEncoder().encode(str)))
-      : // Node.js
-        Buffer.from(str, "utf-8").toString("base64");
+  const base64
+    = typeof btoa === "function"
+      ? btoa(String.fromCharCode(...new TextEncoder().encode(str))) // Browser
+      : Buffer.from(str, "utf-8").toString("base64"); // Node.js
 
   return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -39,7 +37,7 @@ function base64UrlDecode(base64Url: string): string {
 
   if (typeof atob === "function") {
     // Browser
-    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
     return new TextDecoder().decode(bytes);
   }
 

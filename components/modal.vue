@@ -3,9 +3,16 @@ https://codesandbox.io/s/github/vuejs/vuejs.org/tree/master/src/v2/examples/vue-
 // Add body-scroll-lock-ignore on element you want to continue to scroll (iOS)
 
 <template>
-  <div id="modal-template" type="text/x-template">
+  <div
+    id="modal-template"
+    type="text/x-template"
+  >
     <transition name="modal">
-      <div v-if="true" class="modal-mask" @click.self="close">
+      <div
+        v-if="true"
+        class="modal-mask"
+        @click.self="close"
+      >
         <div class="modal-wrapper">
           <div
             class="relative flex flex-col xl:rounded-lg modal-container"
@@ -56,6 +63,7 @@ https://codesandbox.io/s/github/vuejs/vuejs.org/tree/master/src/v2/examples/vue-
 import type { PropType } from "vue";
 
 import * as bodyScrollLock from "body-scroll-lock";
+
 const disableBodyScroll = bodyScrollLock.disableBodyScroll;
 const enableBodyScroll = bodyScrollLock.enableBodyScroll;
 

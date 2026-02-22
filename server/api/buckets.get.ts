@@ -1,21 +1,26 @@
-import { S3ViewerBucket } from "~/server/types/bucket";
+import type { Bucket, S3Client } from "@aws-sdk/client-s3";
+
 import {
-  Bucket,
   ListBucketsCommand,
   ListObjectsV2Command,
-  S3Client,
 } from "@aws-sdk/client-s3";
-import { match, P } from "ts-pattern";
-import { connections } from "~/server/utils/s3";
 import prettyBytes from "pretty-bytes";
+import { match, P } from "ts-pattern";
+
+import type { S3ViewerBucket } from "~/server/types/bucket";
+
 import { groupByFn } from "~/server/utils/functions";
+import { connections } from "~/server/utils/s3";
+
+import type { S3ViewerResponse } from "../types/response";
+
 import { generateBucketIdentityNumber } from "../../functions/bucket-identity-number";
 
 export default defineEventHandler(
   async (): Promise<
     S3ViewerResponse<{
       buckets: Array<S3ViewerBucket>;
-      stats: {};
+      stats: Record<string, unknown>;
     }>
   > => {
     const commmands = await Promise.all(
@@ -24,7 +29,7 @@ export default defineEventHandler(
 
         const buckets = await connection
           .send(new ListBucketsCommand({}))
-          .then((c) => c.Buckets ?? [])
+          .then(c => c.Buckets ?? [])
           .catch((error) => {
             errorMessage = error.message ?? null;
             return [];
@@ -34,7 +39,7 @@ export default defineEventHandler(
           buckets: buckets,
           region: await connection.config
             .region()
-            .then((region) => region ?? null)
+            .then(region => region ?? null)
             .catch(() => null),
           cloudProviderName: await extractCloudProviderName(connection).catch(
             () => null,
@@ -52,7 +57,7 @@ export default defineEventHandler(
     ).flat();
 
     const stats = totalSizeByKey(
-      groupByFn(buckets, (b) => b.cloudProvider.name ?? ""),
+      groupByFn(buckets, b => b.cloudProvider.name ?? ""),
     );
 
     return {
@@ -60,7 +65,7 @@ export default defineEventHandler(
       data: {
         buckets,
         stats: Object.keys(stats)
-          .map((key) => ({
+          .map(key => ({
             cloudProvider: {
               name: key || null,
               logoUrl: getCloudProviderLogoUrl(key),
@@ -107,8 +112,8 @@ export async function mapToS3ViewerBuckets({
   errorMessage: string | null;
 }): Promise<Array<S3ViewerBucket>> {
   async function mapToS3ViewerBucket(bucket: Bucket): Promise<S3ViewerBucket> {
-    const { size: bucketSize, count: filesCount } =
-      errorMessage === null
+    const { size: bucketSize, count: filesCount }
+      = errorMessage === null
         ? await getBucketSizeAndCount(connection, bucket.Name ?? "")
         : { size: 0, count: 0 };
 
@@ -205,7 +210,8 @@ async function getBucketSizeAndCount(
     } while (continuationToken);
 
     return { size: totalSize, count: totalCount };
-  } catch (err) {
+  }
+  catch (err) {
     return { size: 0, count: 0 };
   }
 }

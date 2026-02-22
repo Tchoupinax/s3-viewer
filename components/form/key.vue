@@ -7,8 +7,8 @@
         <label for="name">
           Name
           <input
-            type="text"
             v-model="formData.name"
+            type="text"
             required
             placeholder="Enter name"
           />
@@ -19,8 +19,8 @@
         <label for="publicKey">
           Public Key
           <input
-            type="text"
             v-model="formData.publicKey"
+            type="text"
             required
             placeholder="Enter public key"
           />
@@ -31,19 +31,25 @@
         <label for="privateKey">
           Private Key
           <input
-            type="password"
             v-model="formData.privateKey"
+            type="password"
             required
             placeholder="Enter private key"
           />
         </label>
       </div>
 
-      <button @click="generateNewKeys" class="w-full text-black bg-purple-200">
+      <button
+        class="w-full text-black bg-purple-200"
+        @click="generateNewKeys"
+      >
         Generate Keys
       </button>
 
-      <button class="w-full mt-8" type="submit">
+      <button
+        class="w-full mt-8"
+        type="submit"
+      >
         {{ isEdit ? "Update" : "Create" }}
       </button>
     </form>

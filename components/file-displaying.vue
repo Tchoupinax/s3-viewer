@@ -11,7 +11,9 @@
       }"
     >
       <div class="flex items-center justify-between px-4 py-2 bg-gray-100">
-        <h3 class="font-bold">{{ title }}</h3>
+        <h3 class="font-bold">
+          {{ title }}
+        </h3>
         <button
           class="text-gray-600 hover:text-gray-800"
           @click="$emit('close')"
@@ -27,15 +29,23 @@
           style="min-height: 100vh; width: 100%"
         ></object>
       </div>
-    
+
       <div
         v-if="type === 'jpg' || type === 'jpeg'"
         class="max-h-full overflow-y-auto border border-gray-300"
       >
-        <img v-if="imageUrl" :src="imageUrl" alt="Preview" class="block max-w-full" />
+        <img
+          v-if="imageUrl"
+          :src="imageUrl"
+          alt="Preview"
+          class="block max-w-full"
+        />
       </div>
 
-      <div v-else class="h-full p-2 pt-4 overflow-auto bg-gray-50">
+      <div
+        v-else
+        class="h-full p-2 pt-4 overflow-auto bg-gray-50"
+      >
         <div v-html="jsonObject"></div>
       </div>
     </div>
@@ -68,6 +78,7 @@ export default {
       required: true,
     },
   },
+  emits: ["close"],
   data() {
     return {
       content: "",
@@ -76,6 +87,7 @@ export default {
       pdfUrl: null,
       selectedFileName: "",
       type: "",
+      // eslint-disable-next-line vue/no-reserved-keys
       _escapeHandler: null as ((e: KeyboardEvent) => void) | null,
     };
   },
@@ -97,7 +109,8 @@ export default {
 
     if (this.type === "jpg" || this.type === "jpeg") {
       this.imageUrl = `data:image/jpeg;base64,${this.content}`;
-    } else if (this.type === "pdf") {
+    }
+    else if (this.type === "pdf") {
       const base64ToBlob = (base64, mimeType) => {
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
@@ -133,7 +146,7 @@ export default {
     };
     document.addEventListener("keydown", this._escapeHandler);
   },
-  
+
   beforeUnmount() {
     if (this._escapeHandler) {
       document.removeEventListener("keydown", this._escapeHandler);

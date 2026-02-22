@@ -3,26 +3,23 @@
     <div
       v-for="workspace of apiData?.workspaces"
       :style="`background: ${workspace.color};`"
-      @click="changeWorkspace(workspace)"
       class="flex items-center justify-center p-2 mr-2 text-2xl font-bold text-center text-white border-2 border-gray-600 rounded-lg cursor-pointer size-12"
+      @click="changeWorkspace(workspace)"
     >
       {{ workspace.name.slice(0, 1) }}
     </div>
 
     <div
-      class="flex items-center justify-center"
       v-if="apiData?.workspaces.length === 0"
+      class="flex items-center justify-center"
     >
-      <NuxtLink class="ml-4 text-2xl underline cursor-pointer"
-        >Create your first workspace</NuxtLink
-      >
+      <NuxtLink class="ml-4 text-2xl underline cursor-pointer">Create your first workspace</NuxtLink>
     </div>
 
     <span
       :style="`color: ${preferencesStore.currentWorkspace?.color};`"
       class="ml-4 text-4xl text-white"
-      >|</span
-    >
+    >|</span>
 
     <div
       :style="`color: ${preferencesStore.currentWorkspace?.color};`"
@@ -35,6 +32,7 @@
 
 <script lang="ts" setup>
 import type { Workspace } from ".prisma/client";
+
 import type { MapDateToString } from "~/server/config/types";
 
 const emit = defineEmits(["workspaceChanged"]);

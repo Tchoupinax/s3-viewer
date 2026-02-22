@@ -1,5 +1,6 @@
-import { S3Client } from "@aws-sdk/client-s3";
-import { S3ViewerBucket } from "~/server/types/bucket";
+import type { S3Client } from "@aws-sdk/client-s3";
+
+import type { S3ViewerBucket } from "~/server/types/bucket";
 
 export type Account = {
   connection: S3Client;

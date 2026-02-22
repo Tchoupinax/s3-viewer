@@ -5,9 +5,9 @@
       <div class="form-group">
         <label for="name">Name</label>
         <input
-          type="text"
           id="name"
           v-model="workspace.name"
+          type="text"
           required
           placeholder="Enter workspace name"
         />
@@ -15,17 +15,23 @@
 
       <div class="form-group">
         <label for="color">Color</label>
-        <input type="color" id="color" v-model="workspace.color" required />
+        <input
+          id="color"
+          v-model="workspace.color"
+          type="color"
+          required
+        />
       </div>
 
-      <button type="submit">{{ isEdit ? "Update" : "Create" }}</button>
+      <button type="submit">
+        {{ isEdit ? "Update" : "Create" }}
+      </button>
     </form>
   </div>
 </template>
 
 <script>
 export default {
-  emits: ["create-workspace", "update-workspace"],
   props: {
     initialData: {
       type: Object,
@@ -39,6 +45,7 @@ export default {
       default: false,
     },
   },
+  emits: ["create-workspace", "update-workspace"],
   data() {
     return {
       workspace: { ...this.initialData },
@@ -53,7 +60,8 @@ export default {
     handleSubmit() {
       if (this.isEdit) {
         this.$emit("update-workspace", this.workspace);
-      } else {
+      }
+      else {
         this.$emit("create-workspace", this.workspace);
       }
     },

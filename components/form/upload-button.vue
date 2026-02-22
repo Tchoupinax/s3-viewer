@@ -28,15 +28,15 @@
 
     <form>
       <input
-        hidden
         id="dropzone-file"
+        hidden
         type="file"
-        @change="($e) => emit('uploadFiles', $e)"
         multiple
         webkitdirectory
+        @change="($e) => emit('uploadFiles', $e)"
       />
-      <!--directory-->
-      <!--webkitdirectory-->
+      <!-- directory -->
+      <!-- webkitdirectory -->
     </form>
   </label>
 </template>

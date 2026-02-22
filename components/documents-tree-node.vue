@@ -27,11 +27,20 @@
           />
         </svg>
       </button>
-      <span v-else class="tree-node-chevron-placeholder" />
+      <span
+        v-else
+        class="tree-node-chevron-placeholder"
+      />
 
       <span class="tree-node-icon">
-        <IconFolder v-if="node.isFolder" class="text-amber-500/90" />
-        <IconFile v-else class="text-slate-400" />
+        <IconFolder
+          v-if="node.isFolder"
+          class="text-amber-500/90"
+        />
+        <IconFile
+          v-else
+          class="text-slate-400"
+        />
       </span>
 
       <span
@@ -42,7 +51,10 @@
       </span>
 
       <span class="tree-node-meta">
-        <span v-if="!node.isFolder && node.lastModified" class="tree-node-date">
+        <span
+          v-if="!node.isFolder && node.lastModified"
+          class="tree-node-date"
+        >
           {{ formatDate(node.lastModified) }}
         </span>
         <span class="tree-node-size">{{ formatSize(node.size) }}</span>
@@ -73,8 +85,9 @@
 
 <script setup lang="ts">
 import type { FileNode } from "~/server/types/file-node";
-import IconFolder from "~/components/icon/folder.vue";
+
 import IconFile from "~/components/icon/file.vue";
+import IconFolder from "~/components/icon/folder.vue";
 
 const props = defineProps<{
   node: FileNode;
@@ -85,7 +98,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  toggle: [fullPath: string];
+  "toggle": [fullPath: string];
   "open-file": [fullPath: string];
 }>();
 
@@ -96,7 +109,8 @@ const isExpanded = computed(
 function onRowClick() {
   if (props.node.isFolder) {
     emit("toggle", props.node.fullPath);
-  } else {
+  }
+  else {
     emit("open-file", props.node.fullPath);
   }
 }
