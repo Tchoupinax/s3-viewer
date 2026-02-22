@@ -9,6 +9,8 @@ jobs:
   docker:
     name: Build official container 🐳
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
     - name: Build application 🦫
       uses: tchoupinax/repo-config/shared-actions/steps/node/build@v0
