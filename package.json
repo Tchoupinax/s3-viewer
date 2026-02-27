@@ -12,10 +12,10 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.997.0",
+    "@aws-sdk/client-s3": "3.1000.0",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "1.15.2",
-    "@nuxt/hints": "1.0.0-alpha.8",
+    "@nuxt/hints": "1.0.0-alpha.9",
     "@nuxt/icon": "2.2.1",
     "@nuxtjs/tailwindcss": "6.14.0",
     "nuxt": "4.3.1",
@@ -27,10 +27,10 @@
     "vue-router": "5.0.3"
   },
   "devDependencies": {
-    "@types/node": "25.3.0",
+    "@types/node": "25.3.2",
     "eslint": "10.0.2",
     "eslint-config-tchoupinax": "2.4.0",
     "typescript": "5.9.3"
   },
-  "packageManager": "pnpm@10.30.2"
+  "packageManager": "pnpm@10.30.3"
 }
