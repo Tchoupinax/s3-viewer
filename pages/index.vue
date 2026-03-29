@@ -567,7 +567,7 @@ onMounted(() => {
 
 <style scoped>
 .tree-view {
-  padding: 0.125rem 0;
+  padding: 0.125rem 0 0.125rem 0.75rem;
 }
 
 .tree-view-root {

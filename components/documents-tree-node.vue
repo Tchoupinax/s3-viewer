@@ -2,35 +2,35 @@
   <div class="tree-node">
     <div
       class="tree-node-row group"
-      :style="{ paddingLeft: `${(node.level - 1) * 12 + 4}px` }"
+      :style="{ paddingLeft: `${(node.level - 1) * 24}px` }"
       @click="onRowClick"
     >
-      <button
+      <div
         v-if="node.isFolder"
-        type="button"
-        class="tree-node-chevron"
-        :aria-label="isExpanded ? 'Collapse' : 'Expand'"
-        @click.stop="emit('toggle', node.fullPath)"
+        class="tree-node-chevron-slot"
       >
-        <svg
-          class="tree-chevron"
-          :class="{ 'tree-chevron-open': isExpanded }"
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
+        <button
+          type="button"
+          class="tree-node-chevron"
+          :aria-label="isExpanded ? 'Collapse' : 'Expand'"
+          @click.stop="emit('toggle', node.fullPath)"
         >
-          <path
-            fill-rule="evenodd"
-            d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.06l-4.5 4.25a.75.75 0 01-1.06-.02z"
-            clip-rule="evenodd"
-          />
-        </svg>
-      </button>
-      <span
-        v-else
-        class="tree-node-chevron-placeholder"
-      />
+          <svg
+            class="tree-chevron"
+            :class="{ 'tree-chevron-open': isExpanded }"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.06l-4.5 4.25a.75.75 0 01-1.06-.02z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+      </div>
 
       <span class="tree-node-icon">
         <IconFolder
@@ -88,6 +88,7 @@ import type { FileNode } from "~/server/types/file-node";
 
 import IconFile from "~/components/icon/file.vue";
 import IconFolder from "~/components/icon/folder.vue";
+import DocumentsTreeNode from "./documents-tree-node.vue";
 
 const props = defineProps<{
   node: FileNode;
@@ -133,6 +134,16 @@ function onRowClick() {
   background-color: rgb(241 245 249 / 0.8);
 }
 
+.tree-node-chevron-slot {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
 .tree-node-chevron {
   flex-shrink: 0;
   display: inline-flex;
@@ -140,7 +151,8 @@ function onRowClick() {
   justify-content: center;
   width: 1.25rem;
   height: 1.25rem;
-  margin: 0 -0.25rem 0 0;
+  padding: 0;
+  margin: 0;
   color: rgb(100 116 139);
   border: none;
   background: transparent;
@@ -164,18 +176,11 @@ function onRowClick() {
   transform: rotate(90deg);
 }
 
-.tree-node-chevron-placeholder {
-  flex-shrink: 0;
-  width: 1.25rem;
-  height: 1.25rem;
-  margin-right: 0;
-}
-
 .tree-node-icon {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   width: 1.125rem;
   height: 1.125rem;
 }
@@ -189,19 +194,23 @@ function onRowClick() {
   flex: 1;
   min-width: 0;
   font-size: 0.8125rem;
+  text-align: left;
 }
 
 .tree-node-meta {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.5rem;
   font-size: 0.75rem;
   color: rgb(100 116 139);
+  text-align: left;
 }
 
 .tree-node-date {
   min-width: 4rem;
+  text-align: left;
 }
 
 .tree-node-size {
