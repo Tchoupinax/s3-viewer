@@ -9,6 +9,11 @@ export default defineNuxtConfig({
   ],
   devtools: { enabled: process.env.NODE_ENV !== "production" },
   compatibilityDate: "2025-07-15",
+  hints: {
+    features: {
+      lazyLoad: false,
+    },
+  },
   eslint: {
     // https://eslint.nuxt.com/packages/module#dev-server-checker
     checker: true,

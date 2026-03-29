@@ -52,8 +52,8 @@ export function buildFileTree(
     for (const node of nodes) {
       if (node.children && node.children.length > 0) {
         node.isFolder = true;
-        node.size = node.children.reduce((acc, cur) => acc + cur.size, 0);
         finalizeIsFolder(node.children);
+        node.size = node.children.reduce((acc, cur) => acc + cur.size, 0);
       }
     }
   }
