@@ -30,7 +30,7 @@
     "@types/node": "25.5.0",
     "eslint": "10.1.0",
     "eslint-config-tchoupinax": "2.4.1",
-    "typescript": "5.9.3",
+    "typescript": "6.0.2",
     "vite-plugin-eslint2": "5.1.0"
   },
   "packageManager": "pnpm@10.33.0"
