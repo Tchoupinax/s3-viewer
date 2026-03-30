@@ -9,9 +9,14 @@ export default defineNuxtConfig({
   ],
   devtools: { enabled: process.env.NODE_ENV !== "production" },
   compatibilityDate: "2025-07-15",
-  hints: {
-    features: {
-      lazyLoad: false,
+  vite: {
+    optimizeDeps: {
+      include: [
+        "pretty-bytes",
+        "timeago.js",
+        "ts-pattern",
+        "shikiji",
+      ],
     },
   },
   eslint: {
@@ -24,6 +29,15 @@ export default defineNuxtConfig({
         quotes: "double",
         semi: true,
       },
+    },
+  },
+  hints: {
+    features: {
+      hydration: false,
+      lazyLoad: false,
+      webVitals: false,
+      thirdPartyScripts: false,
+      htmlValidate: false,
     },
   },
 });
