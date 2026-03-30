@@ -10,6 +10,16 @@
     >
     </FileDisplaying>
 
+    <DeleteObjectDialog
+      :open="deleteDialogOpen"
+      :loading="deletePreviewLoading"
+      :preview="deletePreview"
+      :preview-error="deletePreviewError"
+      :deleting="deleteDeleting"
+      @close="closeDeleteDialog"
+      @confirm="confirmDelete"
+    />
+
     <div
       class="flex flex-col h-full w-full max-w-[1600px] p-4 mx-auto space-y-4 sm:p-6 lg:p-8"
     >
@@ -308,6 +318,7 @@
                 @enter-directory="handleDirectoryEntered"
                 @leave-directory="handleDirectoryLeft"
                 @open-file="(filename) => openFile(filename)"
+                @request-delete="openDeleteDialog"
               />
             </template>
 
@@ -328,6 +339,7 @@
                     :count-files="countFilesInNode"
                     @toggle="toggleTreePath"
                     @open-file="openFile"
+                    @request-delete="openDeleteDialog"
                   />
                 </div>
               </div>
@@ -352,14 +364,14 @@ import { format } from "timeago.js";
 import { match } from "ts-pattern";
 import { ref, onMounted } from "vue";
 
+import type { DeletePreviewPayload } from "~/components/delete-object-dialog.vue";
+import type {
+  BucketIdentityNumber,
+} from "~/functions/bucket-identity-number";
 import type { S3ViewerBucket } from "~/server/types/bucket";
-import type { S3ViewerDocument } from "~/server/types/document";
 import type { FileNode } from "~/server/types/file-node";
 
-import {
-  extractGenerateBucketIdentity,
-  type BucketIdentityNumber,
-} from "~/functions/bucket-identity-number";
+import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
 
 const $router = useRouter();
 const $route = useRoute();
@@ -376,7 +388,7 @@ const buckets = ref<Array<S3ViewerBucket>>([]);
 const currentDirectory = ref("<root>");
 const currentFiles = ref([]);
 const currentIndexes = ref<number[]>([]);
-const documents = ref<Array<S3ViewerDocument>>([]);
+const documents = ref<Array<FileNode>>([]);
 const documentsCount = ref<number>(0);
 const displayedFile = ref<{ filename: string; bucketId: string } | null>();
 const selectedBucketId = ref<BucketIdentityNumber | null>(null);
@@ -390,7 +402,12 @@ const errors = ref<Array<string>>([]);
 const documentsViewMode = ref<"list" | "tree">("tree");
 const treeCollapsedPaths = ref<Set<string>>(new Set());
 
-const PAGE_SIZE = 20;
+const deleteDialogOpen = ref(false);
+const deletePreviewLoading = ref(false);
+const deletePreview = ref<DeletePreviewPayload | null>(null);
+const deletePreviewError = ref<string | null>(null);
+const deleteDeleting = ref(false);
+const deleteTargetNode = ref<FileNode | null>(null);
 
 function formatSize(size: number): string {
   return prettyBytes(size ?? 0);
@@ -421,6 +438,105 @@ function toggleTreePath(fullPath: string) {
   if (next.has(fullPath)) next.delete(fullPath);
   else next.add(fullPath);
   treeCollapsedPaths.value = next;
+}
+
+function closeDeleteDialog() {
+  deleteDialogOpen.value = false;
+  deletePreview.value = null;
+  deletePreviewError.value = null;
+  deleteTargetNode.value = null;
+}
+
+async function openDeleteDialog(node: FileNode) {
+  if (!selectedBucketId.value) return;
+  deleteTargetNode.value = node;
+  deleteDialogOpen.value = true;
+  deletePreviewLoading.value = true;
+  deletePreview.value = null;
+  deletePreviewError.value = null;
+  try {
+    const res = await $fetch<{ data: DeletePreviewPayload }>(
+      `/api/buckets/${selectedBucketId.value}/objects/preview`,
+      {
+        query: {
+          key: node.fullPath,
+          isFolder: node.isFolder ? "1" : "0",
+        },
+      },
+    );
+    deletePreview.value = res.data;
+  }
+  catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }; message?: string };
+    deletePreviewError.value
+      = err?.data?.statusMessage ?? err?.message ?? "Failed to load delete preview";
+  }
+  finally {
+    deletePreviewLoading.value = false;
+  }
+}
+
+async function confirmDelete() {
+  if (!selectedBucketId.value || !deleteTargetNode.value) return;
+  deleteDeleting.value = true;
+  deletePreviewError.value = null;
+  try {
+    const node = deleteTargetNode.value;
+    await $fetch(`/api/buckets/${selectedBucketId.value}/objects/delete`, {
+      method: "DELETE",
+      body: { key: node.fullPath, isFolder: node.isFolder },
+    });
+    if (displayedFile.value?.filename === node.fullPath) {
+      displayedFile.value = null;
+    }
+    closeDeleteDialog();
+    await refreshDocuments();
+  }
+  catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }; message?: string };
+    deletePreviewError.value
+      = err?.data?.statusMessage ?? err?.message ?? "Delete failed";
+  }
+  finally {
+    deleteDeleting.value = false;
+  }
+}
+
+async function refreshDocuments() {
+  if (!selectedBucketId.value) return;
+  loadingDocuments.value = true;
+  try {
+    const res = await $fetch<{
+      data: { files: FileNode[]; filesCount: number };
+    }>(`/api/buckets/${selectedBucketId.value}/documents`);
+    documents.value = res.data.files;
+    documentsCount.value = res.data.filesCount;
+
+    let next: FileNode[] = documents.value ?? [];
+    for (const idx of currentIndexes.value) {
+      const node = next[idx];
+      if (!node?.children) {
+        currentDirectory.value = "<root>";
+        currentIndexes.value = [];
+        currentFiles.value = documents.value ?? [];
+        $router.replace({
+          query: { ...$route.query, current_directory: "<root>" },
+        });
+        treeCollapsedPaths.value = new Set(
+          getAllFolderPaths((documents.value ?? []) as FileNode[]),
+        );
+        return;
+      }
+      next = node.children;
+    }
+    currentFiles.value = next;
+    treeCollapsedPaths.value = new Set(
+      getAllFolderPaths((documents.value ?? []) as FileNode[]),
+    );
+  }
+  finally {
+    loadingDocuments.value = false;
+  }
 }
 
 const sortedBuckets = computed(() =>
@@ -468,36 +584,6 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
   finally {
     loadingBuckets.value = false;
     $router.replace({ query: { ...$route.query, bin: bucketIdentityNumber } });
-  }
-};
-
-const loadDocuments = async (reset = false) => {
-  if (!selectedBucketId.value) {
-    return;
-  }
-
-  loadingDocuments.value = true;
-
-  try {
-    const res = await $fetch<{
-      items: DocumentItem[];
-      nextCursor: string | null;
-    }>(`/api/buckets/${selectedBucket.value}/documents`, {
-      query: {
-        limit: PAGE_SIZE,
-        cursor: reset ? undefined : nextCursor.value,
-      },
-    });
-
-    documents.value = reset ? res.items : [...documents.value, ...res.items];
-
-    nextCursor.value = res.nextCursor;
-  }
-  catch (e: any) {
-    error.value = e?.statusMessage || "Failed to load documents";
-  }
-  finally {
-    loadingDocuments.value = false;
   }
 };
 

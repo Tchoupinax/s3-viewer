@@ -50,6 +50,27 @@
         {{ node.name }}
       </span>
 
+      <button
+        type="button"
+        class="tree-node-delete"
+        aria-label="Delete"
+        title="Delete"
+        @click.stop="emit('request-delete', node)"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            fill-rule="evenodd"
+            d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.286a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.47 41.47 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34 0a.75.75 0 10-1.5.06l-.3 7.5a.75.75 0 101.5-.06l.3-7.5z"
+            clip-rule="evenodd"
+          />
+        </svg>
+      </button>
+
       <span class="tree-node-meta">
         <span
           v-if="!node.isFolder && node.lastModified"
@@ -78,6 +99,7 @@
         :count-files="countFiles"
         @toggle="emit('toggle', $event)"
         @open-file="emit('open-file', $event)"
+        @request-delete="emit('request-delete', $event)"
       />
     </template>
   </div>
@@ -88,6 +110,7 @@ import type { FileNode } from "~/server/types/file-node";
 
 import IconFile from "~/components/icon/file.vue";
 import IconFolder from "~/components/icon/folder.vue";
+
 import DocumentsTreeNode from "./documents-tree-node.vue";
 
 const props = defineProps<{
@@ -101,6 +124,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   "toggle": [fullPath: string];
   "open-file": [fullPath: string];
+  "request-delete": [node: FileNode];
 }>();
 
 const isExpanded = computed(
@@ -195,6 +219,42 @@ function onRowClick() {
   min-width: 0;
   font-size: 0.8125rem;
   text-align: left;
+}
+
+.tree-node-delete {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  margin: 0;
+  color: rgb(148 163 184);
+  border: none;
+  background: transparent;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  opacity: 0.35;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.tree-node-row:hover .tree-node-delete,
+.tree-node-delete:focus-visible {
+  opacity: 1;
+}
+
+.tree-node-delete:hover {
+  color: rgb(220 38 38);
+  background: rgb(254 226 226 / 0.6);
+}
+
+.tree-node-delete svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
 }
 
 .tree-node-meta {
