@@ -29,7 +29,7 @@ export default defineEventHandler(
     ) as BucketIdentityNumber;
     const query = getQuery(event);
 
-    const limit = 3000;
+    const pageSize = 1000;
     const cursor = query.cursor as string | undefined;
 
     const { bucketName, accountId }
@@ -46,15 +46,36 @@ export default defineEventHandler(
       });
     }
 
-    const response = await connection?.connection.send(
-      new ListObjectsV2Command({
-        Bucket: bucketName,
-        MaxKeys: limit,
-        ContinuationToken: cursor,
-      }),
-    );
+    const objects: Array<{
+      Key?: string;
+      LastModified?: Date;
+      Size?: number;
+    }> = [];
+    let continuationToken = cursor;
+    let nextCursor: string | null = null;
 
-    const documents: Array<S3ViewerDocument> = (response?.Contents || []).map(
+    do {
+      const response = await connection.connection.send(
+        new ListObjectsV2Command({
+          Bucket: bucketName,
+          MaxKeys: pageSize,
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      if (response.Contents?.length) {
+        objects.push(...response.Contents);
+      }
+
+      continuationToken = response.IsTruncated
+        ? (response.NextContinuationToken ?? undefined)
+        : undefined;
+      nextCursor = response.IsTruncated
+        ? (response.NextContinuationToken ?? null)
+        : null;
+    } while (continuationToken);
+
+    const documents: Array<S3ViewerDocument> = objects.map(
       obj =>
         ({
           name: obj.Key ?? "",
@@ -69,9 +90,7 @@ export default defineEventHandler(
       data: {
         files: buildFileTree(documents),
         filesCount: documents.length,
-        nextCursor: response?.IsTruncated
-          ? (response.NextContinuationToken ?? null)
-          : null,
+        nextCursor,
       },
     };
   },
