@@ -1,0 +1,19 @@
+keyOrder:
+- name
+- version
+- author
+- license
+- main
+- type
+- files
+- engines
+- types
+- exports
+- private
+- description
+- prettier
+- scripts
+- dependencies
+- devDependencies
+- peerDependencies
+- packageManager
