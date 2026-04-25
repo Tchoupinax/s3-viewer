@@ -37,7 +37,7 @@ import type { MapDateToString } from "~/server/config/types";
 
 const emit = defineEmits(["workspaceChanged"]);
 const preferencesStore = usePreferencesStore();
-const { data: apiData } = await useFetch(`/api/workspaces`);
+const { data: apiData } = await useFetch("/api/workspaces");
 
 const changeWorkspace = (workspace: MapDateToString<Workspace>) => {
   preferencesStore.changeWorkspace(workspace).then(async () => {

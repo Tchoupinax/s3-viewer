@@ -38,8 +38,8 @@
 export default {
   methods: {
     loginWithAuthelia() {
-      window.location.href = `/api/oidc/connect`;
-    },
-  },
+      window.location.href = "/api/oidc/connect";
+    }
+  }
 };
 </script>

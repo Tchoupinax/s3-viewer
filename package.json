@@ -4,15 +4,15 @@
   "private": true,
   "scripts": {
     "build": "nuxt build",
+    "lint": "pnpm lint:eslint && pnpm lint:vue:check",
+    "lint:eslint": "nuxt prepare && eslint . --fix",
+    "lint:vue:check": "vue-tsc --noEmit",
     "generate": "nuxt generate",
-    "postinstall": "nuxt prepare",
-    "lint": "eslint --fix .",
-    "lint:inspect": "npx @eslint/config-inspector@latest",
     "preview": "nuxt preview",
     "watch": "nuxt dev"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1034.0",
+    "@aws-sdk/client-s3": "3.1027.0",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "1.15.2",
     "@nuxt/hints": "1.0.3",
@@ -24,7 +24,7 @@
     "timeago.js": "4.0.2",
     "ts-pattern": "5.9.0",
     "vue": "3.5.33",
-    "vue-router": "5.0.5"
+    "vue-router": "5.0.6"
   },
   "devDependencies": {
     "@types/node": "25.6.0",
@@ -33,5 +33,5 @@
     "typescript": "6.0.3",
     "vite-plugin-eslint2": "5.1.0"
   },
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.2"
 }

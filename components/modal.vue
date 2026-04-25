@@ -60,9 +60,8 @@ https://codesandbox.io/s/github/vuejs/vuejs.org/tree/master/src/v2/examples/vue-
 </template>
 
 <script lang="ts">
-import type { PropType } from "vue";
-
 import * as bodyScrollLock from "body-scroll-lock";
+import type { PropType } from "vue";
 
 const disableBodyScroll = bodyScrollLock.disableBodyScroll;
 const enableBodyScroll = bodyScrollLock.enableBodyScroll;
@@ -74,14 +73,14 @@ export default {
     type: {
       required: false,
       default: () => "Standard",
-      type: String as PropType<Type>,
-    },
+      type: String as PropType<Type>
+    }
   },
   emits: ["close"],
   mounted() {
     setTimeout(() => {
       disableBodyScroll(document.querySelector("#modal-template"), {
-        allowTouchMove: (el) => {
+        allowTouchMove: el => {
           while (el && el !== document.body) {
             if (el.getAttribute("body-scroll-lock-ignore") !== null) {
               return true;
@@ -89,10 +88,10 @@ export default {
 
             el = el.parentElement;
           }
-        },
+        }
       });
 
-      document.addEventListener("keyup", (evt) => {
+      document.addEventListener("keyup", evt => {
         if (evt.code === "Escape") {
           this.$emit("close");
         }
@@ -103,8 +102,8 @@ export default {
     close() {
       enableBodyScroll(document.querySelector("#modal-template"));
       this.$emit("close");
-    },
-  },
+    }
+  }
 };
 </script>
 

@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@aws-sdk/client-s3':
-        specifier: 3.1034.0
-        version: 3.1034.0
+        specifier: 3.1027.0
+        version: 3.1027.0
       '@nuxt/a11y':
         specifier: 1.0.0-alpha.1
         version: 1.0.0-alpha.1(magicast@0.5.2)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(terser@5.46.2)(yaml@2.8.3))
@@ -45,8 +45,8 @@ importers:
         specifier: 3.5.33
         version: 3.5.33(typescript@6.0.3)
       vue-router:
-        specifier: 5.0.5
-        version: 5.0.5(@vue/compiler-sfc@3.5.33)(vue@3.5.33(typescript@6.0.3))
+        specifier: 5.0.6
+        version: 5.0.6(@vue/compiler-sfc@3.5.33)(vue@3.5.33(typescript@6.0.3))
     devDependencies:
       '@types/node':
         specifier: 25.6.0
@@ -102,8 +102,8 @@ packages:
   '@aws-crypto/util@5.2.0':
     resolution: {integrity: sha512-4RkU9EsI6ZpBve5fseQlGNUWKMa1RLPQ1dnjnQoe07ldfIzcsGb5hC5W0Dm7u423KWzawlrpbjXBrXCEv9zazQ==}
 
-  '@aws-sdk/client-s3@3.1034.0':
-    resolution: {integrity: sha512-r91IZKPKuRlpCBsEmz9qnWrYxuHD0jsQv1p9UGNasFpcuPo1OnfwIB2ClXtqdXKYUvubXCwn7KBObTVnnvYvAA==}
+  '@aws-sdk/client-s3@3.1027.0':
+    resolution: {integrity: sha512-g6kaFE/pW0Tsoq/BYg8PfXa1hIZQBmyoKtmJTgcbdyzYWiOOu8vj4PZUE2kS8myita6avaY8Ama5IodHJ39lPA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/core@3.974.5':
@@ -5590,8 +5590,8 @@ packages:
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
 
-  vue-router@5.0.5:
-    resolution: {integrity: sha512-aLs92WplJB8h/26/X445WvIi3SiXdWqirq5AQ6g532SKck/tld/v92hsm/ybcQJsFe1d9fXotlbM2SYK98uphA==}
+  vue-router@5.0.6:
+    resolution: {integrity: sha512-9+kmUTGbKMyW9Asoy98IXXYIzrTMT7JDAdpDDeEkorHvybpUvBI2wsrSM5jFOXrFydpzRFJ9vAh+80DN2PGu9w==}
     peerDependencies:
       '@pinia/colada': '>=0.21.2'
       '@vue/compiler-sfc': ^3.5.17
@@ -5809,7 +5809,7 @@ snapshots:
       '@smithy/util-utf8': 2.3.0
       tslib: 2.8.1
 
-  '@aws-sdk/client-s3@3.1034.0':
+  '@aws-sdk/client-s3@3.1027.0':
     dependencies:
       '@aws-crypto/sha1-browser': 5.2.0
       '@aws-crypto/sha256-browser': 5.2.0
@@ -10730,7 +10730,7 @@ snapshots:
       unrouting: 0.1.7
       untyped: 2.0.0
       vue: 3.5.33(typescript@6.0.3)
-      vue-router: 5.0.5(@vue/compiler-sfc@3.5.33)(vue@3.5.33(typescript@6.0.3))
+      vue-router: 5.0.6(@vue/compiler-sfc@3.5.33)(vue@3.5.33(typescript@6.0.3))
     optionalDependencies:
       '@parcel/watcher': 2.5.6
       '@types/node': 25.6.0
@@ -12331,7 +12331,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  vue-router@5.0.5(@vue/compiler-sfc@3.5.33)(vue@3.5.33(typescript@6.0.3)):
+  vue-router@5.0.6(@vue/compiler-sfc@3.5.33)(vue@3.5.33(typescript@6.0.3)):
     dependencies:
       '@babel/generator': 7.29.1
       '@vue-macros/common': 3.1.2(vue@3.5.33(typescript@6.0.3))

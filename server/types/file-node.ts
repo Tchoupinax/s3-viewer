@@ -11,7 +11,7 @@ export type FileNode = {
 };
 
 export function buildFileTree(
-  documents: Array<S3ViewerDocument>,
+  documents: Array<S3ViewerDocument>
 ): Array<FileNode> {
   const root: Array<FileNode> = [];
 
@@ -32,7 +32,7 @@ export function buildFileTree(
             fullPath: currentPath,
             isFolder: index < parts.length - 1,
             size: document.size ?? 0,
-            lastModified: document.lastModified,
+            lastModified: document.lastModified
           };
 
           if (index < parts.length - 1) {
