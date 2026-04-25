@@ -131,7 +131,7 @@
 <script setup lang="ts">
 import prettyBytes from "pretty-bytes";
 import { format } from "timeago.js";
-import { ref, computed, watch, type PropType } from "vue";
+import { computed, type PropType,ref, watch } from "vue";
 
 import type { FileNode } from "~/server/types/file-node";
 
@@ -143,32 +143,32 @@ const emit = defineEmits([
   "leaveDirectory",
   "openFile",
   "uploadFiles",
-  "request-delete",
+  "request-delete"
 ]);
 const props = defineProps({
   currentDirectory: { type: String, required: true },
   currentLevel: { type: Number, required: true },
   displayUploadButton: Boolean,
   files: { type: Array as PropType<Array<FileNode>>, required: true },
-  filesCount: Number,
+  filesCount: Number
 });
 
 const selectedIndex = ref(0);
 
 const formattedDirectory = computed(() =>
-  props.currentDirectory.split("/").join(" / "),
+  props.currentDirectory.split("/").join(" / ")
 );
 const sortedFiles = computed(() => {
   return [...props.files].sort((a, b) => {
-    if (a.isFolder && !b.isFolder) return -1;
-    if (!a.isFolder && b.isFolder) return 1;
+    if (a.isFolder && !b.isFolder) {return -1;}
+    if (!a.isFolder && b.isFolder) {return 1;}
     return a.name.localeCompare(b.name);
   });
 });
 
 const enterDirectory = (folderName: string) => {
   $router.replace({
-    query: { ...$route.query, current_directory: props.currentDirectory + "/" + folderName },
+    query: { ...$route.query, current_directory: props.currentDirectory + "/" + folderName }
   });
 
   emit("enterDirectory", folderName);
@@ -189,34 +189,32 @@ const back = () => {
 
 const handleKeyDown = (event: KeyboardEvent) => {
   if (
-    props.currentLevel > 0
-    && ["Backspace", "ArrowLeft"].includes(event.code)
+    props.currentLevel > 0 &&
+    ["Backspace", "ArrowLeft"].includes(event.code)
   ) {
     back();
   }
 
   if (event.code === "ArrowUp" && selectedIndex.value > 0) {
     selectedIndex.value--;
-  }
-  else if (
-    event.code === "ArrowDown"
-    && props?.files
-    && selectedIndex.value < props?.files?.length - 1
+  } else if (
+    event.code === "ArrowDown" &&
+    props?.files &&
+    selectedIndex.value < props?.files?.length - 1
   ) {
     selectedIndex.value++;
   }
 
   if (["Enter", "ArrowRight"].includes(event.code)) {
     const selectedFile = [...props.files].sort((a, b) => {
-      if (a.isFolder && !b.isFolder) return -1;
-      if (!a.isFolder && b.isFolder) return 1;
+      if (a.isFolder && !b.isFolder) {return -1;}
+      if (!a.isFolder && b.isFolder) {return 1;}
       return a.name.localeCompare(b.name);
     })[selectedIndex.value];
 
     if (selectedFile.isFolder) {
       enterDirectory(selectedFile.name);
-    }
-    else {
+    } else {
       openFile(selectedFile.fullPath);
     }
   }
@@ -226,7 +224,7 @@ watch(
   () => props.files,
   () => {
     selectedIndex.value = 0;
-  },
+  }
 );
 
 onMounted(() => {

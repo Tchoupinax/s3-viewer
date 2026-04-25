@@ -106,12 +106,10 @@
 </template>
 
 <script setup lang="ts">
-import type { FileNode } from "~/server/types/file-node";
-
+import DocumentsTreeNode from "./documents-tree-node.vue";
 import IconFile from "~/components/icon/file.vue";
 import IconFolder from "~/components/icon/folder.vue";
-
-import DocumentsTreeNode from "./documents-tree-node.vue";
+import type { FileNode } from "~/server/types/file-node";
 
 const props = defineProps<{
   node: FileNode;
@@ -122,20 +120,19 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "toggle": [fullPath: string];
+  toggle: [fullPath: string];
   "open-file": [fullPath: string];
   "request-delete": [node: FileNode];
 }>();
 
 const isExpanded = computed(
-  () => !props.collapsedPaths.has(props.node.fullPath),
+  () => !props.collapsedPaths.has(props.node.fullPath)
 );
 
 function onRowClick() {
   if (props.node.isFolder) {
     emit("toggle", props.node.fullPath);
-  }
-  else {
+  } else {
     emit("open-file", props.node.fullPath);
   }
 }

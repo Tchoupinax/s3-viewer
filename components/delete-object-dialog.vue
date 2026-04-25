@@ -210,27 +210,27 @@ const acknowledged = ref(false);
 
 watch(
   () => props.open,
-  (v) => {
-    if (v) acknowledged.value = false;
-  },
+  v => {
+    if (v) {acknowledged.value = false;}
+  }
 );
 
 watch(
   () => props.preview,
   () => {
     acknowledged.value = false;
-  },
+  }
 );
 
 const title = computed(() => {
-  if (!props.preview) return "Delete object";
+  if (!props.preview) {return "Delete object";}
   return props.preview.kind === "folder"
     ? "Delete folder"
     : "Delete file";
 });
 
 const warningText = computed(() => {
-  if (!props.preview) return "";
+  if (!props.preview) {return "";}
   if (props.preview.kind === "folder") {
     return "Every object whose key starts with this path will be deleted. Subfolders are included.";
   }
@@ -238,16 +238,15 @@ const warningText = computed(() => {
 });
 
 const canSubmit = computed(() => {
-  if (!props.preview || props.loading || props.previewError) return false;
-  if (props.preview.objectCount === 0) return false;
+  if (!props.preview || props.loading || props.previewError) {return false;}
+  if (props.preview.objectCount === 0) {return false;}
   return true;
 });
 
 function formatIso(iso: string) {
   try {
     return new Date(iso).toLocaleString();
-  }
-  catch {
+  } catch {
     return iso;
   }
 }

@@ -362,26 +362,25 @@
 import prettyBytes from "pretty-bytes";
 import { format } from "timeago.js";
 import { match } from "ts-pattern";
-import { ref, onMounted } from "vue";
+import { onMounted,ref } from "vue";
 
 import type { DeletePreviewPayload } from "~/components/delete-object-dialog.vue";
+import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
 import type {
-  BucketIdentityNumber,
+  BucketIdentityNumber
 } from "~/functions/bucket-identity-number";
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { FileNode } from "~/server/types/file-node";
-
-import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
 
 const $router = useRouter();
 const $route = useRoute();
 
 useHead({
   title:
-    window?.location
-    && new URL(window?.location?.toString()).hostname === "localhost"
+    window?.location &&
+    new URL(window?.location?.toString()).hostname === "localhost"
       ? "🚀 DEV 🚀 S3 Viewer"
-      : "S3 Viewer",
+      : "S3 Viewer"
 });
 
 const buckets = ref<Array<S3ViewerBucket>>([]);
@@ -414,10 +413,10 @@ function formatSize(size: number): string {
 }
 
 function countFilesInNode(node: FileNode): number {
-  if (!node.isFolder) return 1;
+  if (!node.isFolder) {return 1;}
   return (node.children ?? []).reduce(
     (sum, child) => sum + countFilesInNode(child),
-    0,
+    0
   );
 }
 
@@ -426,8 +425,7 @@ function getAllFolderPaths(nodes: FileNode[]): string[] {
   for (const node of nodes) {
     if (node.isFolder) {
       paths.push(node.fullPath);
-      if (node.children?.length)
-        paths.push(...getAllFolderPaths(node.children));
+      if (node.children?.length) {paths.push(...getAllFolderPaths(node.children));}
     }
   }
   return paths;
@@ -435,8 +433,7 @@ function getAllFolderPaths(nodes: FileNode[]): string[] {
 
 function toggleTreePath(fullPath: string) {
   const next = new Set(treeCollapsedPaths.value);
-  if (next.has(fullPath)) next.delete(fullPath);
-  else next.add(fullPath);
+  if (next.has(fullPath)) {next.delete(fullPath);} else {next.add(fullPath);}
   treeCollapsedPaths.value = next;
 }
 
@@ -448,7 +445,7 @@ function closeDeleteDialog() {
 }
 
 async function openDeleteDialog(node: FileNode) {
-  if (!selectedBucketId.value) return;
+  if (!selectedBucketId.value) {return;}
   deleteTargetNode.value = node;
   deleteDialogOpen.value = true;
   deletePreviewLoading.value = true;
@@ -460,50 +457,46 @@ async function openDeleteDialog(node: FileNode) {
       {
         query: {
           key: node.fullPath,
-          isFolder: node.isFolder ? "1" : "0",
-        },
-      },
+          isFolder: node.isFolder ? "1" : "0"
+        }
+      }
     );
     deletePreview.value = res.data;
-  }
-  catch (e: unknown) {
+  } catch (e: unknown) {
     const err = e as { data?: { statusMessage?: string }; message?: string };
-    deletePreviewError.value
-      = err?.data?.statusMessage ?? err?.message ?? "Failed to load delete preview";
-  }
-  finally {
+    deletePreviewError.value =
+      err?.data?.statusMessage ?? err?.message ?? "Failed to load delete preview";
+  } finally {
     deletePreviewLoading.value = false;
   }
 }
 
 async function confirmDelete() {
-  if (!selectedBucketId.value || !deleteTargetNode.value) return;
+  if (!selectedBucketId.value || !deleteTargetNode.value) {return;}
   deleteDeleting.value = true;
   deletePreviewError.value = null;
   try {
     const node = deleteTargetNode.value;
     await $fetch(`/api/buckets/${selectedBucketId.value}/objects/delete`, {
       method: "DELETE",
-      body: { key: node.fullPath, isFolder: node.isFolder },
+      body: { key: node.fullPath, isFolder: node.isFolder }
     });
     if (displayedFile.value?.filename === node.fullPath) {
       displayedFile.value = null;
     }
     closeDeleteDialog();
     await refreshDocuments();
-  }
-  catch (e: unknown) {
+  } catch (e: unknown) {
     const err = e as { data?: { statusMessage?: string }; message?: string };
-    deletePreviewError.value
-      = err?.data?.statusMessage ?? err?.message ?? "Delete failed";
-  }
-  finally {
+    deletePreviewError.value =
+      err?.data?.statusMessage ?? err?.message ?? "Delete failed";
+  } finally {
     deleteDeleting.value = false;
   }
 }
 
 async function refreshDocuments() {
-  if (!selectedBucketId.value) return;
+  if (!selectedBucketId.value) {return;}
   loadingDocuments.value = true;
   try {
     const res = await $fetch<{
@@ -520,10 +513,10 @@ async function refreshDocuments() {
         currentIndexes.value = [];
         currentFiles.value = documents.value ?? [];
         $router.replace({
-          query: { ...$route.query, current_directory: "<root>" },
+          query: { ...$route.query, current_directory: "<root>" }
         });
         treeCollapsedPaths.value = new Set(
-          getAllFolderPaths((documents.value ?? []) as FileNode[]),
+          getAllFolderPaths((documents.value ?? []) as FileNode[])
         );
         return;
       }
@@ -531,10 +524,9 @@ async function refreshDocuments() {
     }
     currentFiles.value = next;
     treeCollapsedPaths.value = new Set(
-      getAllFolderPaths((documents.value ?? []) as FileNode[]),
+      getAllFolderPaths((documents.value ?? []) as FileNode[])
     );
-  }
-  finally {
+  } finally {
     loadingDocuments.value = false;
   }
 }
@@ -545,15 +537,15 @@ const sortedBuckets = computed(() =>
       .with("name", () =>
         (sortDirection.value === "asc" ? a.name > b.name : a.name < b.name)
           ? 1
-          : -1,
+          : -1
       )
       .with("size", () =>
         (sortDirection.value === "asc" ? a.size > b.size : a.size < b.size)
           ? -1
-          : 1,
+          : 1
       )
-      .exhaustive(),
-  ),
+      .exhaustive()
+  )
 );
 
 const loadBuckets = async () => {
@@ -563,8 +555,7 @@ const loadBuckets = async () => {
     const res = await $fetch("/api/buckets");
     buckets.value = res.data.buckets;
     stats.value = res.data.stats;
-  }
-  finally {
+  } finally {
     loadingBuckets.value = false;
   }
 };
@@ -578,10 +569,9 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
     currentFiles.value = res.data.files ?? [];
     documentsCount.value = res.data.filesCount;
     treeCollapsedPaths.value = new Set(
-      getAllFolderPaths((res.data.files ?? []) as FileNode[]),
+      getAllFolderPaths((res.data.files ?? []) as FileNode[])
     );
-  }
-  finally {
+  } finally {
     loadingBuckets.value = false;
     $router.replace({ query: { ...$route.query, bin: bucketIdentityNumber } });
   }
@@ -589,7 +579,7 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
 
 const handleDirectoryEntered = (folderName: string) => {
   const folderIndex = currentFiles.value.findIndex(
-    f => f.name === folderName,
+    f => f.name === folderName
   );
   const nodeName = currentFiles.value[folderIndex].name;
   currentFiles.value = currentFiles.value[folderIndex]?.children ?? [];
@@ -601,14 +591,13 @@ const handleDirectoryEntered = (folderName: string) => {
 const handleDirectoryLeft = () => {
   if (currentIndexes.value.length === 1) {
     currentFiles.value = documents.value ?? [];
-  }
-  else {
+  } else {
     let tempFiles = documents.value ?? [];
     const indexes = currentIndexes.value;
     for (let i = 0; i < indexes.length - 1; i++) {
       const node = tempFiles?.[indexes[i]];
       const next = node?.children;
-      if (next == null) break;
+      if (next == null) {break;}
       tempFiles = next;
     }
     currentFiles.value = tempFiles ?? [];
@@ -625,7 +614,7 @@ const openFile = async (filename: string) => {
   if (selectedBucketId.value) {
     displayedFile.value = {
       filename: filename,
-      bucketId: selectedBucketId.value,
+      bucketId: selectedBucketId.value
     };
   }
 };
@@ -641,7 +630,7 @@ onMounted(() => {
       const parts = localCurrentDirectory.split("/");
       for (const part of parts.slice(1)) {
         const folderIndex = currentFiles.value.findIndex(
-          f => f.name === part,
+          f => f.name === part
         );
         currentFiles.value = currentFiles.value[folderIndex]?.children ?? [];
         currentIndexes.value.push(folderIndex);

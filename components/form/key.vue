@@ -60,15 +60,15 @@
 import { ref } from "vue";
 
 const emit = defineEmits(["keyCreated", "keyUpdated"]);
-const props = defineProps({
-  isEdit: { type: Boolean, required: true },
+defineProps({
+  isEdit: { type: Boolean, required: true }
 });
 
 // Reactive state
 const formData = ref({
   name: "",
   publicKey: "",
-  privateKey: "",
+  privateKey: ""
 });
 
 const generateNewKeys = async (e: Event) => {
@@ -77,8 +77,8 @@ const generateNewKeys = async (e: Event) => {
   const data = await $fetch("/api/keys/generate", {
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
-    },
+      "Content-Type": "application/json"
+    }
   });
 
   formData.value.publicKey = data.publicKey;
@@ -90,9 +90,9 @@ const handleSubmit = async () => {
     credentials: "include",
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/json"
     },
-    body: JSON.stringify(formData.value),
+    body: JSON.stringify(formData.value)
   });
 
   emit("keyCreated", response);
