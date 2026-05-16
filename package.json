@@ -12,26 +12,26 @@
     "watch": "nuxt dev"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1038.0",
+    "@aws-sdk/client-s3": "3.1045.0",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxt/eslint": "1.15.2",
-    "@nuxt/hints": "1.0.3",
-    "@nuxt/icon": "2.2.1",
+    "@nuxt/hints": "1.1.1",
+    "@nuxt/icon": "2.2.2",
     "@nuxtjs/tailwindcss": "6.14.0",
-    "nuxt": "4.4.2",
+    "nuxt": "4.4.5",
     "pretty-bytes": "7.1.0",
     "shikiji": "0.10.2",
     "timeago.js": "4.0.2",
     "ts-pattern": "5.9.0",
-    "vue": "3.5.33",
-    "vue-router": "5.0.6"
+    "vue": "3.5.34",
+    "vue-router": "5.0.7"
   },
   "devDependencies": {
-    "@types/node": "25.6.0",
-    "eslint": "10.2.1",
+    "@types/node": "25.7.0",
+    "eslint": "10.3.0",
     "eslint-config-tchoupinax": "2.5.0",
     "typescript": "6.0.3",
     "vite-plugin-eslint2": "5.1.0"
   },
-  "packageManager": "pnpm@10.33.2"
+  "packageManager": "pnpm@10.33.4"
 }
