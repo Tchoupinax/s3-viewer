@@ -71,12 +71,12 @@ export default {
   props: {
     filename: {
       type: String,
-      required: true
+      required: true,
     },
     bucketId: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
   },
   emits: ["close"],
   data() {
@@ -88,18 +88,18 @@ export default {
       selectedFileName: "",
       type: "",
       // eslint-disable-next-line vue/no-reserved-keys
-      _escapeHandler: null as ((e: KeyboardEvent) => void) | null
+      _escapeHandler: null as ((e: KeyboardEvent) => void) | null,
     };
   },
   computed: {
     title() {
       return this.filename;
-    }
+    },
   },
   async mounted() {
     const encodedFilePath = btoa(encodeURIComponent(this.filename));
     const data = await $fetch(
-      `/api/files/download?file=${encodedFilePath}&bucketIdentityNumber=${this.bucketId}`
+      `/api/files/download?file=${encodedFilePath}&bucketIdentityNumber=${this.bucketId}`,
     );
 
     if (data) {
@@ -127,7 +127,7 @@ export default {
     if (this.type !== "pdf") {
       const shiki = await getHighlighter({
         themes: ["nord", "dark-plus"],
-        langs: processLangs(this.filename)
+        langs: processLangs(this.filename),
       });
 
       await shiki.loadTheme("vitesse-light");
@@ -136,7 +136,7 @@ export default {
       this.jsonObject = shiki.codeToHtml(this.content, {
         theme: "none",
         lang: "",
-        defaultColor: "light"
+        defaultColor: "light",
       });
     }
 
@@ -150,7 +150,7 @@ export default {
     if (this._escapeHandler) {
       document.removeEventListener("keydown", this._escapeHandler);
     }
-  }
+  },
 };
 </script>
 

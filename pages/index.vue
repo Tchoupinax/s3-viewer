@@ -367,7 +367,7 @@ import { onMounted,ref } from "vue";
 import type { DeletePreviewPayload } from "~/components/delete-object-dialog.vue";
 import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
 import type {
-  BucketIdentityNumber
+  BucketIdentityNumber,
 } from "~/functions/bucket-identity-number";
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { FileNode } from "~/server/types/file-node";
@@ -380,7 +380,7 @@ useHead({
     window?.location &&
     new URL(window?.location?.toString()).hostname === "localhost"
       ? "🚀 DEV 🚀 S3 Viewer"
-      : "S3 Viewer"
+      : "S3 Viewer",
 });
 
 const buckets = ref<Array<S3ViewerBucket>>([]);
@@ -416,7 +416,7 @@ function countFilesInNode(node: FileNode): number {
   if (!node.isFolder) {return 1;}
   return (node.children ?? []).reduce(
     (sum, child) => sum + countFilesInNode(child),
-    0
+    0,
   );
 }
 
@@ -457,9 +457,9 @@ async function openDeleteDialog(node: FileNode) {
       {
         query: {
           key: node.fullPath,
-          isFolder: node.isFolder ? "1" : "0"
-        }
-      }
+          isFolder: node.isFolder ? "1" : "0",
+        },
+      },
     );
     deletePreview.value = res.data;
   } catch (e: unknown) {
@@ -479,7 +479,7 @@ async function confirmDelete() {
     const node = deleteTargetNode.value;
     await $fetch(`/api/buckets/${selectedBucketId.value}/objects/delete`, {
       method: "DELETE",
-      body: { key: node.fullPath, isFolder: node.isFolder }
+      body: { key: node.fullPath, isFolder: node.isFolder },
     });
     if (displayedFile.value?.filename === node.fullPath) {
       displayedFile.value = null;
@@ -513,10 +513,10 @@ async function refreshDocuments() {
         currentIndexes.value = [];
         currentFiles.value = documents.value ?? [];
         $router.replace({
-          query: { ...$route.query, current_directory: "<root>" }
+          query: { ...$route.query, current_directory: "<root>" },
         });
         treeCollapsedPaths.value = new Set(
-          getAllFolderPaths((documents.value ?? []) as FileNode[])
+          getAllFolderPaths((documents.value ?? []) as FileNode[]),
         );
         return;
       }
@@ -524,7 +524,7 @@ async function refreshDocuments() {
     }
     currentFiles.value = next;
     treeCollapsedPaths.value = new Set(
-      getAllFolderPaths((documents.value ?? []) as FileNode[])
+      getAllFolderPaths((documents.value ?? []) as FileNode[]),
     );
   } finally {
     loadingDocuments.value = false;
@@ -537,15 +537,15 @@ const sortedBuckets = computed(() =>
       .with("name", () =>
         (sortDirection.value === "asc" ? a.name > b.name : a.name < b.name)
           ? 1
-          : -1
+          : -1,
       )
       .with("size", () =>
         (sortDirection.value === "asc" ? a.size > b.size : a.size < b.size)
           ? -1
-          : 1
+          : 1,
       )
-      .exhaustive()
-  )
+      .exhaustive(),
+  ),
 );
 
 const loadBuckets = async () => {
@@ -569,7 +569,7 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
     currentFiles.value = res.data.files ?? [];
     documentsCount.value = res.data.filesCount;
     treeCollapsedPaths.value = new Set(
-      getAllFolderPaths((res.data.files ?? []) as FileNode[])
+      getAllFolderPaths((res.data.files ?? []) as FileNode[]),
     );
   } finally {
     loadingBuckets.value = false;
@@ -579,7 +579,7 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
 
 const handleDirectoryEntered = (folderName: string) => {
   const folderIndex = currentFiles.value.findIndex(
-    f => f.name === folderName
+    f => f.name === folderName,
   );
   const nodeName = currentFiles.value[folderIndex].name;
   currentFiles.value = currentFiles.value[folderIndex]?.children ?? [];
@@ -614,7 +614,7 @@ const openFile = async (filename: string) => {
   if (selectedBucketId.value) {
     displayedFile.value = {
       filename: filename,
-      bucketId: selectedBucketId.value
+      bucketId: selectedBucketId.value,
     };
   }
 };
@@ -630,7 +630,7 @@ onMounted(() => {
       const parts = localCurrentDirectory.split("/");
       for (const part of parts.slice(1)) {
         const folderIndex = currentFiles.value.findIndex(
-          f => f.name === part
+          f => f.name === part,
         );
         currentFiles.value = currentFiles.value[folderIndex]?.children ?? [];
         currentIndexes.value.push(folderIndex);

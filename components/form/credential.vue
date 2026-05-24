@@ -97,18 +97,18 @@ export default {
         s3Endpoint: "",
         s3Region: "",
         s3SecretKey: "",
-        workspaceId: ""
-      })
+        workspaceId: "",
+      }),
     },
     isEdit: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   emits: ["create-credential", "update-credential"],
   data() {
     return {
-      credential: { ...this.initialData }
+      credential: { ...this.initialData },
     };
   },
   mounted() {
@@ -128,8 +128,8 @@ export default {
       return `#${Math.floor(Math.random() * 16777215)
         .toString(16)
         .padStart(6, "0")}`;
-    }
-  }
+    },
+  },
 };
 </script>
 

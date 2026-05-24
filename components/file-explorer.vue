@@ -143,20 +143,20 @@ const emit = defineEmits([
   "leaveDirectory",
   "openFile",
   "uploadFiles",
-  "request-delete"
+  "request-delete",
 ]);
 const props = defineProps({
   currentDirectory: { type: String, required: true },
   currentLevel: { type: Number, required: true },
   displayUploadButton: Boolean,
   files: { type: Array as PropType<Array<FileNode>>, required: true },
-  filesCount: Number
+  filesCount: Number,
 });
 
 const selectedIndex = ref(0);
 
 const formattedDirectory = computed(() =>
-  props.currentDirectory.split("/").join(" / ")
+  props.currentDirectory.split("/").join(" / "),
 );
 const sortedFiles = computed(() => {
   return [...props.files].sort((a, b) => {
@@ -168,7 +168,7 @@ const sortedFiles = computed(() => {
 
 const enterDirectory = (folderName: string) => {
   $router.replace({
-    query: { ...$route.query, current_directory: props.currentDirectory + "/" + folderName }
+    query: { ...$route.query, current_directory: props.currentDirectory + "/" + folderName },
   });
 
   emit("enterDirectory", folderName);
@@ -224,7 +224,7 @@ watch(
   () => props.files,
   () => {
     selectedIndex.value = 0;
-  }
+  },
 );
 
 onMounted(() => {

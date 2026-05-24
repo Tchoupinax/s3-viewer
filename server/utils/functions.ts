@@ -1,6 +1,6 @@
 export function groupByFn<T, K extends PropertyKey>(
   array: T[],
-  fn: (item: T) => K
+  fn: (item: T) => K,
 ): Record<K, T[]> {
   return array.reduce(
     (acc, item) => {
@@ -8,6 +8,6 @@ export function groupByFn<T, K extends PropertyKey>(
       (acc[key] ||= []).push(item);
       return acc;
     },
-    {} as Record<K, T[]>
+    {} as Record<K, T[]>,
   );
 }

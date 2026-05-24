@@ -37,18 +37,18 @@ export default {
       type: Object,
       default: () => ({
         name: "",
-        color: "#000000"
-      })
+        color: "#000000",
+      }),
     },
     isEdit: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   emits: ["create-workspace", "update-workspace"],
   data() {
     return {
-      workspace: { ...this.initialData }
+      workspace: { ...this.initialData },
     };
   },
   mounted() {
@@ -63,8 +63,8 @@ export default {
       } else {
         this.$emit("create-workspace", this.workspace);
       }
-    }
-  }
+    },
+  },
 };
 </script>
 

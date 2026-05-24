@@ -212,14 +212,14 @@ watch(
   () => props.open,
   v => {
     if (v) {acknowledged.value = false;}
-  }
+  },
 );
 
 watch(
   () => props.preview,
   () => {
     acknowledged.value = false;
-  }
+  },
 );
 
 const title = computed(() => {

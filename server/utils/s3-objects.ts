@@ -3,7 +3,7 @@ import {
   DeleteObjectsCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
-  type S3Client
+  type S3Client,
 } from "@aws-sdk/client-s3";
 
 import prettyBytes from "pretty-bytes";
@@ -30,12 +30,12 @@ export async function previewObjectDeletion(
   connection: S3Client,
   bucketName: string,
   key: string,
-  isFolder: boolean
+  isFolder: boolean,
 ): Promise<ObjectDeletePreview> {
   if (!key || key.includes("..")) {
     throw createError({
       statusCode: 400,
-      statusMessage: "Invalid key"
+      statusMessage: "Invalid key",
     });
   }
 
@@ -44,15 +44,15 @@ export async function previewObjectDeletion(
       .send(
         new HeadObjectCommand({
           Bucket: bucketName,
-          Key: key
-        })
+          Key: key,
+        }),
       )
       .catch(() => null);
 
     if (!head) {
       throw createError({
         statusCode: 404,
-        statusMessage: "Object not found"
+        statusMessage: "Object not found",
       });
     }
 
@@ -66,7 +66,7 @@ export async function previewObjectDeletion(
       totalSizeHuman: prettyBytes(size),
       lastModified: head.LastModified?.toISOString() ?? null,
       sampleKeys: [key],
-      listTruncatedForDisplay: false
+      listTruncatedForDisplay: false,
     };
   }
 
@@ -81,8 +81,8 @@ export async function previewObjectDeletion(
         Bucket: bucketName,
         Prefix: prefix,
         ContinuationToken: continuationToken,
-        MaxKeys: 1000
-      })
+        MaxKeys: 1000,
+      }),
     );
 
     for (const obj of resp.Contents ?? []) {
@@ -101,8 +101,8 @@ export async function previewObjectDeletion(
     .send(
       new HeadObjectCommand({
         Bucket: bucketName,
-        Key: key
-      })
+        Key: key,
+      }),
     )
     .catch(() => null);
 
@@ -124,7 +124,7 @@ export async function previewObjectDeletion(
       totalSizeHuman: prettyBytes(0),
       lastModified: null,
       sampleKeys: [],
-      listTruncatedForDisplay: false
+      listTruncatedForDisplay: false,
     };
   }
 
@@ -137,7 +137,7 @@ export async function previewObjectDeletion(
     totalSizeHuman: prettyBytes(totalSizeBytes),
     lastModified: null,
     sampleKeys,
-    listTruncatedForDisplay
+    listTruncatedForDisplay,
   };
 }
 
@@ -145,12 +145,12 @@ export async function executeObjectDeletion(
   connection: S3Client,
   bucketName: string,
   key: string,
-  isFolder: boolean
+  isFolder: boolean,
 ): Promise<{ deletedCount: number }> {
   if (!key || key.includes("..")) {
     throw createError({
       statusCode: 400,
-      statusMessage: "Invalid key"
+      statusMessage: "Invalid key",
     });
   }
 
@@ -158,8 +158,8 @@ export async function executeObjectDeletion(
     await connection.send(
       new DeleteObjectCommand({
         Bucket: bucketName,
-        Key: key
-      })
+        Key: key,
+      }),
     );
     return { deletedCount: 1 };
   }
@@ -174,8 +174,8 @@ export async function executeObjectDeletion(
         Bucket: bucketName,
         Prefix: prefix,
         ContinuationToken: continuationToken,
-        MaxKeys: 1000
-      })
+        MaxKeys: 1000,
+      }),
     );
 
     for (const obj of resp.Contents ?? []) {
@@ -191,8 +191,8 @@ export async function executeObjectDeletion(
     .send(
       new HeadObjectCommand({
         Bucket: bucketName,
-        Key: key
-      })
+        Key: key,
+      }),
     )
     .catch(() => null);
 
@@ -211,9 +211,9 @@ export async function executeObjectDeletion(
         Bucket: bucketName,
         Delete: {
           Objects: batch.map(k => ({ Key: k })),
-          Quiet: true
-        }
-      })
+          Quiet: true,
+        },
+      }),
     );
   }
 

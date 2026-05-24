@@ -126,7 +126,7 @@ const emit = defineEmits<{
 }>();
 
 const isExpanded = computed(
-  () => !props.collapsedPaths.has(props.node.fullPath)
+  () => !props.collapsedPaths.has(props.node.fullPath),
 );
 
 function onRowClick() {

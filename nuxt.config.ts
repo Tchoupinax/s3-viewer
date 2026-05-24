@@ -5,7 +5,7 @@ export default defineNuxtConfig({
     "@nuxt/eslint",
     "@nuxt/hints",
     "@nuxt/icon",
-    "@nuxtjs/tailwindcss"
+    "@nuxtjs/tailwindcss",
   ],
   devtools: { enabled: process.env.NODE_ENV !== "production" },
   compatibilityDate: "2025-07-15",
@@ -15,9 +15,9 @@ export default defineNuxtConfig({
         "pretty-bytes",
         "timeago.js",
         "ts-pattern",
-        "shikiji"
-      ]
-    }
+        "shikiji",
+      ],
+    },
   },
   hints: {
     features: {
@@ -25,7 +25,7 @@ export default defineNuxtConfig({
       lazyLoad: false,
       webVitals: false,
       thirdPartyScripts: false,
-      htmlValidate: false
-    }
-  }
+      htmlValidate: false,
+    },
+  },
 });

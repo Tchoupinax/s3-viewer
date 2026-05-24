@@ -73,8 +73,8 @@ export default {
     type: {
       required: false,
       default: () => "Standard",
-      type: String as PropType<Type>
-    }
+      type: String as PropType<Type>,
+    },
   },
   emits: ["close"],
   mounted() {
@@ -88,7 +88,7 @@ export default {
 
             el = el.parentElement;
           }
-        }
+        },
       });
 
       document.addEventListener("keyup", evt => {
@@ -102,8 +102,8 @@ export default {
     close() {
       enableBodyScroll(document.querySelector("#modal-template"));
       this.$emit("close");
-    }
-  }
+    },
+  },
 };
 </script>
 

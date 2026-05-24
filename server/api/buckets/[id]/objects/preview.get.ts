@@ -6,11 +6,11 @@ import { previewObjectDeletion } from "~/server/utils/s3-objects";
 
 export default defineEventHandler(
   async (
-    event
+    event,
   ): Promise<S3ViewerResponse<Awaited<ReturnType<typeof previewObjectDeletion>>>> => {
     const bucketIdentityNumber = getRouterParam(
       event,
-      "id"
+      "id",
     ) as BucketIdentityNumber;
     const query = getQuery(event);
     const key = String(query.key ?? "").trim();
@@ -27,7 +27,7 @@ export default defineEventHandler(
     if (!connection || !bucketName) {
       throw createError({
         statusCode: 404,
-        statusMessage: "Bucket not found"
+        statusMessage: "Bucket not found",
       });
     }
 
@@ -35,12 +35,12 @@ export default defineEventHandler(
       connection.connection,
       bucketName,
       key,
-      isFolder
+      isFolder,
     );
 
     return {
       status: "OK",
-      data: preview
+      data: preview,
     };
-  }
+  },
 );

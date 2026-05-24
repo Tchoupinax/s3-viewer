@@ -7,15 +7,15 @@ export type BucketIdentity = {
 };
 
 export function generateBucketIdentityNumber(
-  bucketIdentity: BucketIdentity
+  bucketIdentity: BucketIdentity,
 ): BucketIdentityNumber {
   return base64UrlEncode(
-    JSON.stringify(bucketIdentity)
+    JSON.stringify(bucketIdentity),
   ) as BucketIdentityNumber;
 }
 
 export function extractGenerateBucketIdentity(
-  bucketIdentityNumber: BucketIdentityNumber
+  bucketIdentityNumber: BucketIdentityNumber,
 ): BucketIdentity {
   return JSON.parse(base64UrlDecode(bucketIdentityNumber)) as BucketIdentity;
 }

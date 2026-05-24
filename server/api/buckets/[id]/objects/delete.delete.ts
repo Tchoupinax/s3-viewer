@@ -6,11 +6,11 @@ import { executeObjectDeletion } from "~/server/utils/s3-objects";
 
 export default defineEventHandler(
   async (
-    event
+    event,
   ): Promise<S3ViewerResponse<{ deletedCount: number }>> => {
     const bucketIdentityNumber = getRouterParam(
       event,
-      "id"
+      "id",
     ) as BucketIdentityNumber;
     const body = await readBody<{
       key?: string;
@@ -28,7 +28,7 @@ export default defineEventHandler(
     if (!connection || !bucketName) {
       throw createError({
         statusCode: 404,
-        statusMessage: "Bucket not found"
+        statusMessage: "Bucket not found",
       });
     }
 
@@ -36,12 +36,12 @@ export default defineEventHandler(
       connection.connection,
       bucketName,
       key,
-      isFolder
+      isFolder,
     );
 
     return {
       status: "OK",
-      data: result
+      data: result,
     };
-  }
+  },
 );

@@ -8,7 +8,7 @@ const REQUIRED_FIELDS = [
   "ID",
   "NAME",
   "REGION",
-  "SECRET_KEY"
+  "SECRET_KEY",
 ] as const;
 
 type RawAccount = {
@@ -42,7 +42,7 @@ export function loadS3AccountsFromEnv(): Array<Account> {
     for (const field of REQUIRED_FIELDS) {
       if (!raw[field]) {
         throw new Error(
-          `Missing env var: S3_VIEWER_ACCOUNT_${accountKey}_${field}`
+          `Missing env var: S3_VIEWER_ACCOUNT_${accountKey}_${field}`,
         );
       }
     }
@@ -56,10 +56,10 @@ export function loadS3AccountsFromEnv(): Array<Account> {
         forcePathStyle: true,
         credentials: {
           accessKeyId: raw.ACCESS_KEY,
-          secretAccessKey: raw.SECRET_KEY
-        }
+          secretAccessKey: raw.SECRET_KEY,
+        },
       }),
-      mappedBuckets: null
+      mappedBuckets: null,
     };
   });
 }
