@@ -20,6 +20,8 @@ export default defineEventHandler(
       files: Array<FileNode>;
       filesCount: number;
       nextCursor: string | null;
+      readOnly: boolean;
+      readOnlyReason: string | null;
     }>
   > => {
     const bucketIdentityNumber = getRouterParam(
@@ -90,6 +92,10 @@ export default defineEventHandler(
         files: buildFileTree(documents),
         filesCount: documents.length,
         nextCursor,
+        readOnly: connection.readOnly,
+        readOnlyReason: connection.readOnly
+          ? "This account is configured with read-only credentials."
+          : null,
       },
     };
   },

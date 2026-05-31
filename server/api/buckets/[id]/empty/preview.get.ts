@@ -2,27 +2,16 @@ import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
 import { extractGenerateBucketIdentity } from "~/functions/bucket-identity-number";
 import type { S3ViewerResponse } from "~/server/types/response";
 import { connections } from "~/server/utils/s3";
-import {
-  assertWriteAccess,
-  rethrowWriteAccessError,
-} from "~/server/utils/s3-permissions";
-import { executeObjectDeletion } from "~/server/utils/s3-objects";
+import { previewBucketEmpty } from "~/server/utils/s3-objects";
 
 export default defineEventHandler(
   async (
     event,
-  ): Promise<S3ViewerResponse<{ deletedCount: number }>> => {
+  ): Promise<S3ViewerResponse<Awaited<ReturnType<typeof previewBucketEmpty>>>> => {
     const bucketIdentityNumber = getRouterParam(
       event,
       "id",
     ) as BucketIdentityNumber;
-    const body = await readBody<{
-      key?: string;
-      isFolder?: boolean;
-    }>(event);
-
-    const key = String(body?.key ?? "").trim();
-    const isFolder = Boolean(body?.isFolder);
 
     const { bucketName, accountId } =
       extractGenerateBucketIdentity(bucketIdentityNumber);
@@ -36,22 +25,14 @@ export default defineEventHandler(
       });
     }
 
-    assertWriteAccess(connection);
+    const preview = await previewBucketEmpty(
+      connection.connection,
+      bucketName,
+    );
 
-    try {
-      const result = await executeObjectDeletion(
-        connection.connection,
-        bucketName,
-        key,
-        isFolder,
-      );
-
-      return {
-        status: "OK",
-        data: result,
-      };
-    } catch (error) {
-      rethrowWriteAccessError(error);
-    }
+    return {
+      status: "OK",
+      data: preview,
+    };
   },
 );

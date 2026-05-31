@@ -51,6 +51,7 @@
       </span>
 
       <button
+        v-if="allowDelete"
         type="button"
         class="tree-node-delete"
         aria-label="Delete"
@@ -97,6 +98,7 @@
         :format-size="formatSize"
         :format-date="formatDate"
         :count-files="countFiles"
+        :allow-delete="allowDelete"
         @toggle="emit('toggle', $event)"
         @open-file="emit('open-file', $event)"
         @request-delete="emit('request-delete', $event)"
@@ -117,6 +119,7 @@ const props = defineProps<{
   formatSize: (size: number) => string;
   formatDate: (date: Date | null) => string;
   countFiles: (node: FileNode) => number;
+  allowDelete?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -128,6 +131,8 @@ const emit = defineEmits<{
 const isExpanded = computed(
   () => !props.collapsedPaths.has(props.node.fullPath),
 );
+
+const allowDelete = computed(() => props.allowDelete ?? true);
 
 function onRowClick() {
   if (props.node.isFolder) {

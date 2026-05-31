@@ -18,7 +18,13 @@ type RawAccount = {
   NAME: string;
   REGION: string;
   SECRET_KEY: string;
+  READ_ONLY?: string;
 };
+
+function parseReadOnly(value: string | undefined): boolean {
+  if (!value) {return false;}
+  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+}
 
 export function loadS3AccountsFromEnv(): Array<Account> {
   const rawAccounts: Record<string, RawAccount> = {};
@@ -50,6 +56,7 @@ export function loadS3AccountsFromEnv(): Array<Account> {
     return {
       id: raw.ID,
       organizationOrAccountName: raw.NAME,
+      readOnly: parseReadOnly(raw.READ_ONLY),
       connection: new S3Client({
         endpoint: raw.ENDPOINT,
         region: raw.REGION,
