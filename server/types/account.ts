@@ -7,4 +7,5 @@ export type Account = {
   id: string;
   mappedBuckets: Array<S3ViewerBucket> | null;
   organizationOrAccountName: string;
+  readOnly: boolean;
 };

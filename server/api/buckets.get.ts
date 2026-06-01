@@ -24,7 +24,6 @@ export default defineEventHandler(
       connections.map(({ connection, organizationOrAccountName, id }) =>
         withTimeout(
           (async () => {
-            console.log(id)
             let errorMessage: string | null = null;
 
             const buckets = await connection

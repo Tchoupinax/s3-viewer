@@ -6,7 +6,7 @@ import {
   assertWriteAccess,
   rethrowWriteAccessError,
 } from "~/server/utils/s3-permissions";
-import { executeObjectDeletion } from "~/server/utils/s3-objects";
+import { executeBucketEmpty } from "~/server/utils/s3-objects";
 
 export default defineEventHandler(
   async (
@@ -16,13 +16,6 @@ export default defineEventHandler(
       event,
       "id",
     ) as BucketIdentityNumber;
-    const body = await readBody<{
-      key?: string;
-      isFolder?: boolean;
-    }>(event);
-
-    const key = String(body?.key ?? "").trim();
-    const isFolder = Boolean(body?.isFolder);
 
     const { bucketName, accountId } =
       extractGenerateBucketIdentity(bucketIdentityNumber);
@@ -39,11 +32,9 @@ export default defineEventHandler(
     assertWriteAccess(connection);
 
     try {
-      const result = await executeObjectDeletion(
+      const result = await executeBucketEmpty(
         connection.connection,
         bucketName,
-        key,
-        isFolder,
       );
 
       return {

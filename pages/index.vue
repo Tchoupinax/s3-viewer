@@ -20,6 +20,27 @@
       @confirm="confirmDelete"
     />
 
+    <EmptyBucketDialog
+      :open="emptyBucketDialogOpen"
+      :loading="emptyBucketPreviewLoading"
+      :preview="emptyBucketPreview"
+      :preview-error="emptyBucketPreviewError"
+      :emptying="emptyBucketDeleting"
+      @close="closeEmptyBucketDialog"
+      @confirm="confirmEmptyBucket"
+    />
+
+    <ReadOnlyErrorDialog
+      :open="readOnlyErrorOpen"
+      :message="readOnlyErrorMessage"
+      @close="readOnlyErrorOpen = false"
+    />
+
+    <BucketEmptyWaitingModal
+      :open="emptyBucketDeleting"
+      :bucket-name="emptyBucketWaitingBucketName"
+    />
+
     <div
       class="flex flex-col h-full w-full max-w-[1600px] p-4 mx-auto space-y-4 sm:p-6 lg:p-8"
     >
@@ -259,42 +280,61 @@
               Documents
             </h2>
 
-            <div
-              class="flex items-center gap-1 p-0.5 bg-slate-100 rounded-full"
-            >
-              <button
-                :disabled="loadingDocuments || !documents.length"
-                type="button"
-                :class="[
-                  'px-3 py-1.5 text-xs rounded-full transition',
-                  documentsViewMode === 'list'
-                    ? 'bg-white shadow-sm text-slate-900'
-                    : 'text-slate-500',
-                  loadingDocuments || !documents.length
-                    ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
-                    : 'hover:text-slate-700 hover:bg-white',
-                ]"
-                @click="documentsViewMode = 'list'"
+            <div class="flex items-center gap-2">
+              <span
+                v-if="selectedBucketReadOnly"
+                class="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-amber-800 bg-amber-50 border border-amber-200 rounded-full"
               >
-                File Explorer
-              </button>
+                Read-only
+              </span>
 
               <button
-                :disabled="loadingDocuments || !documents.length"
+                v-if="selectedBucket && selectedBucket.errorMessage === null && !selectedBucketReadOnly"
                 type="button"
-                :class="[
-                  'px-3 py-1.5 text-xs rounded-full transition',
-                  documentsViewMode === 'tree'
-                    ? 'bg-white shadow-sm text-slate-900'
-                    : 'text-slate-500',
-                  loadingDocuments || !documents.length
-                    ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
-                    : 'hover:text-slate-700 hover:bg-white',
-                ]"
-                @click="documentsViewMode = 'tree'"
+                :disabled="loadingDocuments"
+                class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                @click="openEmptyBucketDialog"
               >
-                Tree
+                Empty bucket
               </button>
+
+              <div
+                class="flex items-center gap-1 p-0.5 bg-slate-100 rounded-full"
+              >
+                <button
+                  :disabled="loadingDocuments || !documents.length"
+                  type="button"
+                  :class="[
+                    'px-3 py-1.5 text-xs rounded-full transition',
+                    documentsViewMode === 'list'
+                      ? 'bg-white shadow-sm text-slate-900'
+                      : 'text-slate-500',
+                    loadingDocuments || !documents.length
+                      ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                      : 'hover:text-slate-700 hover:bg-white',
+                  ]"
+                  @click="documentsViewMode = 'list'"
+                >
+                  File Explorer
+                </button>
+
+                <button
+                  :disabled="loadingDocuments || !documents.length"
+                  type="button"
+                  :class="[
+                    'px-3 py-1.5 text-xs rounded-full transition',
+                    documentsViewMode === 'tree'
+                      ? 'bg-white shadow-sm text-slate-900'
+                      : 'text-slate-500',
+                    loadingDocuments || !documents.length
+                      ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                      : 'hover:text-slate-700 hover:bg-white',
+                  ]"
+                  @click="documentsViewMode = 'tree'"
+                >
+                  Tree
+                </button>
+              </div>
             </div>
           </div>
 
@@ -315,6 +355,7 @@
                 :files="currentFiles"
                 :files-count="documentsCount"
                 :display-upload-button="false"
+                :allow-delete="!selectedBucketReadOnly"
                 @enter-directory="handleDirectoryEntered"
                 @leave-directory="handleDirectoryLeft"
                 @open-file="(filename) => openFile(filename)"
@@ -337,6 +378,7 @@
                     :format-size="formatSize"
                     :format-date="format"
                     :count-files="countFilesInNode"
+                    :allow-delete="!selectedBucketReadOnly"
                     @toggle="toggleTreePath"
                     @open-file="openFile"
                     @request-delete="openDeleteDialog"
@@ -366,11 +408,16 @@ import { onMounted,ref } from "vue";
 
 import type { DeletePreviewPayload } from "~/components/delete-object-dialog.vue";
 import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
+import type { EmptyBucketPreviewPayload } from "~/components/empty-bucket-dialog.vue";
+import EmptyBucketDialog from "~/components/empty-bucket-dialog.vue";
+import ReadOnlyErrorDialog from "~/components/read-only-error-dialog.vue";
+import BucketEmptyWaitingModal from "~/components/bucket-empty-waiting-modal.vue";
 import type {
   BucketIdentityNumber,
 } from "~/functions/bucket-identity-number";
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { FileNode } from "~/server/types/file-node";
+import { getFetchErrorMessage, isReadOnlyFetchError } from "~/utils/api-error";
 
 const $router = useRouter();
 const $route = useRoute();
@@ -407,6 +454,62 @@ const deletePreview = ref<DeletePreviewPayload | null>(null);
 const deletePreviewError = ref<string | null>(null);
 const deleteDeleting = ref(false);
 const deleteTargetNode = ref<FileNode | null>(null);
+
+const emptyBucketDialogOpen = ref(false);
+const emptyBucketPreviewLoading = ref(false);
+const emptyBucketPreview = ref<EmptyBucketPreviewPayload | null>(null);
+const emptyBucketPreviewError = ref<string | null>(null);
+const emptyBucketDeleting = ref(false);
+const emptyBucketWaitingBucketName = ref<string | null>(null);
+
+const selectedBucketReadOnly = ref(false);
+const selectedBucketReadOnlyReason = ref<string | null>(null);
+const readOnlyErrorOpen = ref(false);
+const readOnlyErrorMessage = ref("");
+
+function applyDocumentsResponse(data: {
+  files: FileNode[];
+  filesCount: number;
+  readOnly?: boolean;
+  readOnlyReason?: string | null;
+}) {
+  documents.value = data.files;
+  documentsCount.value = data.filesCount;
+  selectedBucketReadOnly.value = data.readOnly ?? false;
+  selectedBucketReadOnlyReason.value = data.readOnlyReason ?? null;
+}
+
+function showReadOnlyError(message?: string) {
+  readOnlyErrorMessage.value =
+    message
+    ?? selectedBucketReadOnlyReason.value
+    ?? "These credentials are read-only. Write operations are not allowed.";
+  readOnlyErrorOpen.value = true;
+}
+
+function guardWriteAccess(): boolean {
+  if (selectedBucketReadOnly.value) {
+    showReadOnlyError();
+    return false;
+  }
+  return true;
+}
+
+function handleWriteError(
+  error: unknown,
+  fallbackMessage: string,
+  inlineError: { value: string | null },
+  closeDialog?: () => void,
+) {
+  if (isReadOnlyFetchError(error)) {
+    selectedBucketReadOnly.value = true;
+    if (closeDialog) {closeDialog();}
+    showReadOnlyError(getFetchErrorMessage(error, fallbackMessage));
+    return;
+  }
+
+  inlineError.value = getFetchErrorMessage(error, fallbackMessage);
+}
 
 function formatSize(size: number): string {
   return prettyBytes(size ?? 0);
@@ -445,7 +548,7 @@ function closeDeleteDialog() {
 }
 
 async function openDeleteDialog(node: FileNode) {
-  if (!selectedBucketId.value) {return;}
+  if (!selectedBucketId.value || !guardWriteAccess()) {return;}
   deleteTargetNode.value = node;
   deleteDialogOpen.value = true;
   deletePreviewLoading.value = true;
@@ -487,11 +590,76 @@ async function confirmDelete() {
     closeDeleteDialog();
     await refreshDocuments();
   } catch (e: unknown) {
-    const err = e as { data?: { statusMessage?: string }; message?: string };
-    deletePreviewError.value =
-      err?.data?.statusMessage ?? err?.message ?? "Delete failed";
+    handleWriteError(
+      e,
+      "Delete failed",
+      deletePreviewError,
+      closeDeleteDialog,
+    );
   } finally {
     deleteDeleting.value = false;
+  }
+}
+
+function closeEmptyBucketDialog() {
+  emptyBucketDialogOpen.value = false;
+  emptyBucketPreview.value = null;
+  emptyBucketPreviewError.value = null;
+}
+
+async function openEmptyBucketDialog() {
+  if (!selectedBucketId.value || !guardWriteAccess()) {return;}
+  emptyBucketDialogOpen.value = true;
+  emptyBucketPreviewLoading.value = true;
+  emptyBucketPreview.value = null;
+  emptyBucketPreviewError.value = null;
+  try {
+    const res = await $fetch<{ data: EmptyBucketPreviewPayload }>(
+      `/api/buckets/${selectedBucketId.value}/empty/preview`,
+    );
+    emptyBucketPreview.value = res.data;
+  } catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }; message?: string };
+    emptyBucketPreviewError.value =
+      err?.data?.statusMessage ?? err?.message ?? "Failed to load bucket preview";
+  } finally {
+    emptyBucketPreviewLoading.value = false;
+  }
+}
+
+async function confirmEmptyBucket() {
+  if (!selectedBucketId.value) {return;}
+
+  emptyBucketWaitingBucketName.value = emptyBucketPreview.value?.bucketName ?? null;
+  emptyBucketPreviewError.value = null;
+  emptyBucketDialogOpen.value = false;
+  emptyBucketDeleting.value = true;
+
+  try {
+    await $fetch(`/api/buckets/${selectedBucketId.value}/empty`, {
+      method: "DELETE",
+    });
+    displayedFile.value = null;
+    closeEmptyBucketDialog();
+    await refreshDocuments();
+    await loadBuckets();
+  } catch (e: unknown) {
+    if (isReadOnlyFetchError(e)) {
+      handleWriteError(
+        e,
+        "Failed to empty bucket",
+        emptyBucketPreviewError,
+      );
+    } else {
+      emptyBucketPreviewError.value = getFetchErrorMessage(
+        e,
+        "Failed to empty bucket",
+      );
+      emptyBucketDialogOpen.value = true;
+    }
+  } finally {
+    emptyBucketDeleting.value = false;
+    emptyBucketWaitingBucketName.value = null;
   }
 }
 
@@ -500,10 +668,14 @@ async function refreshDocuments() {
   loadingDocuments.value = true;
   try {
     const res = await $fetch<{
-      data: { files: FileNode[]; filesCount: number };
+      data: {
+        files: FileNode[];
+        filesCount: number;
+        readOnly: boolean;
+        readOnlyReason: string | null;
+      };
     }>(`/api/buckets/${selectedBucketId.value}/documents`);
-    documents.value = res.data.files;
-    documentsCount.value = res.data.filesCount;
+    applyDocumentsResponse(res.data);
 
     let next: FileNode[] = documents.value ?? [];
     for (const idx of currentIndexes.value) {
@@ -548,6 +720,10 @@ const sortedBuckets = computed(() =>
   ),
 );
 
+const selectedBucket = computed(() =>
+  buckets.value.find(b => b.id === selectedBucketId.value) ?? null,
+);
+
 const loadBuckets = async () => {
   loadingBuckets.value = true;
 
@@ -564,10 +740,16 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
   selectedBucketId.value = bucketIdentityNumber;
 
   try {
-    const res = await $fetch(`/api/buckets/${bucketIdentityNumber}/documents`);
-    documents.value = res.data.files;
+    const res = await $fetch<{
+      data: {
+        files: FileNode[];
+        filesCount: number;
+        readOnly: boolean;
+        readOnlyReason: string | null;
+      };
+    }>(`/api/buckets/${bucketIdentityNumber}/documents`);
+    applyDocumentsResponse(res.data);
     currentFiles.value = res.data.files ?? [];
-    documentsCount.value = res.data.filesCount;
     treeCollapsedPaths.value = new Set(
       getAllFolderPaths((res.data.files ?? []) as FileNode[]),
     );

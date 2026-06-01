@@ -100,6 +100,7 @@
               />
 
               <button
+                v-if="allowDelete"
                 type="button"
                 class="inline-flex items-center justify-center rounded-lg p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                 aria-label="Delete"
@@ -149,6 +150,7 @@ const props = defineProps({
   currentDirectory: { type: String, required: true },
   currentLevel: { type: Number, required: true },
   displayUploadButton: Boolean,
+  allowDelete: { type: Boolean, default: true },
   files: { type: Array as PropType<Array<FileNode>>, required: true },
   filesCount: Number,
 });
