@@ -13,9 +13,9 @@ export function isS3AccessDeniedError(error: unknown): boolean {
   };
 
   return (
-    e.name === "AccessDenied"
-    || e.Code === "AccessDenied"
-    || e.$metadata?.httpStatusCode === 403
+    e.name === "AccessDenied" ||
+    e.Code === "AccessDenied" ||
+    e.$metadata?.httpStatusCode === 403
   );
 }
 
