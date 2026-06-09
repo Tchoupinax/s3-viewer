@@ -406,12 +406,12 @@ import { format } from "timeago.js";
 import { match } from "ts-pattern";
 import { onMounted,ref } from "vue";
 
+import BucketEmptyWaitingModal from "~/components/bucket-empty-waiting-modal.vue";
 import type { DeletePreviewPayload } from "~/components/delete-object-dialog.vue";
 import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
 import type { EmptyBucketPreviewPayload } from "~/components/empty-bucket-dialog.vue";
 import EmptyBucketDialog from "~/components/empty-bucket-dialog.vue";
 import ReadOnlyErrorDialog from "~/components/read-only-error-dialog.vue";
-import BucketEmptyWaitingModal from "~/components/bucket-empty-waiting-modal.vue";
 import type {
   BucketIdentityNumber,
 } from "~/functions/bucket-identity-number";
@@ -481,9 +481,9 @@ function applyDocumentsResponse(data: {
 
 function showReadOnlyError(message?: string) {
   readOnlyErrorMessage.value =
-    message
-    ?? selectedBucketReadOnlyReason.value
-    ?? "These credentials are read-only. Write operations are not allowed.";
+    message ??
+    selectedBucketReadOnlyReason.value ??
+    "These credentials are read-only. Write operations are not allowed.";
   readOnlyErrorOpen.value = true;
 }
 

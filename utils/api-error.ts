@@ -18,8 +18,8 @@ export function isReadOnlyFetchError(error: unknown): boolean {
   const message = getFetchErrorMessage(error, "").toLowerCase();
 
   return (
-    err.data?.code === "READ_ONLY"
-    || (err.statusCode === 403 && message.includes("read-only"))
-    || (err.statusCode === 403 && message.includes("permission to modify"))
+    err.data?.code === "READ_ONLY" ||
+    (err.statusCode === 403 && message.includes("read-only")) ||
+    (err.statusCode === 403 && message.includes("permission to modify"))
   );
 }

@@ -2,11 +2,11 @@ import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
 import { extractGenerateBucketIdentity } from "~/functions/bucket-identity-number";
 import type { S3ViewerResponse } from "~/server/types/response";
 import { connections } from "~/server/utils/s3";
+import { executeObjectDeletion } from "~/server/utils/s3-objects";
 import {
   assertWriteAccess,
   rethrowWriteAccessError,
 } from "~/server/utils/s3-permissions";
-import { executeObjectDeletion } from "~/server/utils/s3-objects";
 
 export default defineEventHandler(
   async (
