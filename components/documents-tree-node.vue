@@ -2,14 +2,12 @@
   <div class="tree-node">
     <div
       class="tree-node-row group"
-      :style="{ paddingLeft: `${(node.level - 1) * 24}px` }"
+      :style="{ paddingLeft: `${(node.level - 1) * 20}px` }"
       @click="onRowClick"
     >
-      <div
-        v-if="node.isFolder"
-        class="tree-node-chevron-slot"
-      >
+      <div class="tree-node-chevron-slot">
         <button
+          v-if="node.isFolder"
           type="button"
           class="tree-node-chevron"
           :aria-label="isExpanded ? 'Collapse' : 'Expand'"
@@ -50,43 +48,49 @@
         {{ node.name }}
       </span>
 
-      <button
-        v-if="allowDelete"
-        type="button"
-        class="tree-node-delete"
-        aria-label="Delete"
-        title="Delete"
-        @click.stop="emit('request-delete', node)"
+      <div
+        class="tree-node-actions"
+        :class="{ 'tree-node-actions-readonly': !allowDelete }"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.286a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.47 41.47 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34 0a.75.75 0 10-1.5.06l-.3 7.5a.75.75 0 101.5-.06l.3-7.5z"
-            clip-rule="evenodd"
-          />
-        </svg>
-      </button>
+        <span class="tree-col-size">{{ formatSize(node.size) }}</span>
 
-      <span class="tree-node-meta">
-        <span
-          v-if="!node.isFolder && node.lastModified"
-          class="tree-node-date"
-        >
-          {{ formatDate(node.lastModified) }}
+        <span class="tree-col-meta">
+          <span
+            v-if="node.isFolder"
+            class="tree-pill"
+          >
+            {{ countFiles(node) }} {{ countFiles(node) === 1 ? "file" : "files" }}
+          </span>
+          <span
+            v-else
+            class="tree-meta-text"
+          >
+            {{ node.lastModified ? formatDate(node.lastModified) : "—" }}
+          </span>
         </span>
-        <span class="tree-node-size">{{ formatSize(node.size) }}</span>
-        <span
-          v-if="node.isFolder"
-          class="tree-node-count"
+
+        <button
+          v-if="allowDelete"
+          type="button"
+          class="tree-node-delete"
+          aria-label="Delete"
+          title="Delete"
+          @click.stop="emit('request-delete', node)"
         >
-          {{ countFiles(node) }} {{ countFiles(node) === 1 ? 'file' : 'files' }}
-        </span>
-      </span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.286a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.47 41.47 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34 0a.75.75 0 10-1.5.06l-.3 7.5a.75.75 0 101.5-.06l.3-7.5z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <template v-if="node.isFolder && isExpanded && node.children?.length">
@@ -149,52 +153,48 @@ function onRowClick() {
   align-items: center;
   gap: 0.375rem;
   min-height: 2rem;
-  padding-right: 0.5rem;
-  padding-top: 2px;
-  padding-bottom: 2px;
+  padding: 0.25rem 0.5rem 0.25rem 0.375rem;
   border-radius: 0.5rem;
-  transition: background-color 0.12s ease;
+  transition: background-color 0.15s ease;
 }
 
 .tree-node-row:hover {
-  background-color: rgb(241 245 249 / 0.8);
+  background-color: rgb(248 250 252);
 }
 
 .tree-node-chevron-slot {
   flex-shrink: 0;
-  box-sizing: border-box;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.125rem;
+  height: 1.125rem;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .tree-node-chevron {
-  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.125rem;
+  height: 1.125rem;
   padding: 0;
   margin: 0;
-  color: rgb(100 116 139);
+  color: rgb(148 163 184);
   border: none;
   background: transparent;
   border-radius: 0.25rem;
   cursor: pointer;
-  transition: color 0.12s ease, transform 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .tree-node-chevron:hover {
-  color: rgb(51 65 85);
-  background: rgb(226 232 240 / 0.6);
+  color: rgb(71 85 105);
+  background: rgb(241 245 249);
 }
 
 .tree-chevron {
-  width: 0.875rem;
-  height: 0.875rem;
+  width: 0.75rem;
+  height: 0.75rem;
   transition: transform 0.2s ease;
 }
 
@@ -206,9 +206,9 @@ function onRowClick() {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  width: 1.125rem;
-  height: 1.125rem;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
 }
 
 .tree-node-icon :deep(svg) {
@@ -220,11 +220,62 @@ function onRowClick() {
   flex: 1;
   min-width: 0;
   font-size: 0.8125rem;
-  text-align: left;
+  line-height: 1.25rem;
+}
+
+.tree-node-actions {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: var(--tree-col-size, 4.25rem) var(--tree-col-meta, 5.25rem) var(--tree-col-delete, 1.5rem);
+  align-items: center;
+  column-gap: var(--tree-col-gap, 0.75rem);
+  width: var(--tree-actions-width, 11.5rem);
+}
+
+.tree-node-actions-readonly {
+  grid-template-columns: var(--tree-col-size, 4.25rem) var(--tree-col-meta, 5.25rem);
+  width: var(--tree-actions-width-readonly, 9.25rem);
+}
+
+.tree-col-size {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: rgb(100 116 139);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tree-col-meta {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.tree-pill {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: rgb(241 245 249);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: rgb(100 116 139);
+}
+
+.tree-meta-text {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  color: rgb(148 163 184);
 }
 
 .tree-node-delete {
-  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -237,11 +288,11 @@ function onRowClick() {
   background: transparent;
   border-radius: 0.375rem;
   cursor: pointer;
-  opacity: 0.35;
+  opacity: 0;
   transition:
-    color 0.12s ease,
-    background-color 0.12s ease,
-    opacity 0.12s ease;
+    color 0.15s ease,
+    background-color 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .tree-node-row:hover .tree-node-delete,
@@ -251,41 +302,11 @@ function onRowClick() {
 
 .tree-node-delete:hover {
   color: rgb(220 38 38);
-  background: rgb(254 226 226 / 0.6);
+  background: rgb(254 242 242);
 }
 
 .tree-node-delete svg {
-  width: 0.9375rem;
-  height: 0.9375rem;
-}
-
-.tree-node-meta {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  color: rgb(100 116 139);
-  text-align: left;
-}
-
-.tree-node-date {
-  min-width: 4rem;
-  text-align: left;
-}
-
-.tree-node-size {
-  font-variant-numeric: tabular-nums;
-  min-width: 3.5rem;
-  text-align: right;
-}
-
-.tree-node-count {
-  padding: 0.125rem 0.375rem;
-  border-radius: 9999px;
-  background: rgb(226 232 240 / 0.8);
-  color: rgb(71 85 105);
-  font-weight: 500;
+  width: 0.875rem;
+  height: 0.875rem;
 }
 </style>
