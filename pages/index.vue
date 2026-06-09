@@ -366,7 +366,27 @@
             <template
               v-else-if="documentsViewMode === 'tree' && documents.length"
             >
-              <div class="tree-view">
+              <div
+                class="tree-view"
+                :class="{ 'tree-view-readonly': selectedBucketReadOnly }"
+              >
+                <div class="tree-view-header">
+                  <span
+                    class="tree-view-header-lead"
+                    aria-hidden="true"
+                  />
+                  <span class="tree-view-header-name">Name</span>
+                  <div class="tree-view-header-actions">
+                    <span class="tree-view-col-size">Size</span>
+                    <span class="tree-view-col-meta">Info</span>
+                    <span
+                      v-if="!selectedBucketReadOnly"
+                      class="tree-view-col-delete"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+
                 <div
                   v-for="node in documents"
                   :key="node.fullPath"
@@ -824,11 +844,84 @@ onMounted(() => {
 
 <style scoped>
 .tree-view {
-  padding: 0.125rem 0 0.125rem 0.75rem;
+  --tree-lead-width: 2.875rem;
+  --tree-col-size: 4.25rem;
+  --tree-col-meta: 5.25rem;
+  --tree-col-delete: 1.5rem;
+  --tree-col-gap: 0.75rem;
+  --tree-actions-width: calc(
+    var(--tree-col-size) + var(--tree-col-gap) +
+    var(--tree-col-meta) + var(--tree-col-gap) +
+    var(--tree-col-delete)
+  );
+  --tree-actions-width-readonly: calc(
+    var(--tree-col-size) + var(--tree-col-gap) + var(--tree-col-meta)
+  );
+  padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+}
+
+.tree-view-header {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.375rem;
+  border-radius: 0.5rem;
+  background: rgb(248 250 252 / 0.9);
+}
+
+.tree-view-header-lead {
+  flex-shrink: 0;
+  width: var(--tree-lead-width);
+}
+
+.tree-view-header-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(148 163 184);
+}
+
+.tree-view-header-actions {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: var(--tree-col-size) var(--tree-col-meta) var(--tree-col-delete);
+  align-items: center;
+  column-gap: var(--tree-col-gap);
+  width: var(--tree-actions-width);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(148 163 184);
+}
+
+.tree-view-readonly .tree-view-header-actions {
+  grid-template-columns: var(--tree-col-size) var(--tree-col-meta);
+  width: var(--tree-actions-width-readonly);
+}
+
+.tree-view-col-size {
+  justify-self: end;
+  text-align: right;
+}
+
+.tree-view-col-meta {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 0;
+}
+
+.tree-view-col-delete {
+  width: var(--tree-col-delete);
 }
 
 .tree-view-root {
-  margin-bottom: 0.125rem;
+  margin-bottom: 0.0625rem;
 }
 
 .tree-view-root:last-child {
