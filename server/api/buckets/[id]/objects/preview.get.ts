@@ -1,6 +1,7 @@
 import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
 import { extractGenerateBucketIdentity } from "~/functions/bucket-identity-number";
 import type { S3ViewerResponse } from "~/server/types/response";
+import { getEventQuery } from "~/server/utils/event-query";
 import { connections } from "~/server/utils/s3";
 import { previewObjectDeletion } from "~/server/utils/s3-objects";
 
@@ -12,7 +13,7 @@ export default defineEventHandler(
       event,
       "id",
     ) as BucketIdentityNumber;
-    const query = getQuery(event);
+    const query = getEventQuery(event);
     const key = String(query.key ?? "").trim();
     const isFolder =
       query.isFolder === "true" ||

@@ -12,6 +12,7 @@ import {
 import prettyBytes from "pretty-bytes";
 
 const DELETE_BATCH = 1000;
+const PROGRESS_DELETE_BATCH = 20;
 
 export type ObjectDeletePreview = {
   kind: "file" | "folder";
@@ -43,17 +44,25 @@ type S3ObjectIdentifier = {
   VersionId?: string;
 };
 
+export type DeleteProgressCallback = (
+  deleted: number,
+  total: number,
+) => void;
+
 async function deleteObjectIdentifiers(
   connection: S3Client,
   bucketName: string,
   objects: S3ObjectIdentifier[],
+  onProgress?: DeleteProgressCallback,
 ): Promise<number> {
   if (objects.length === 0) {return 0;}
 
   let deletedCount = 0;
+  const total = objects.length;
+  const batchSize = onProgress ? PROGRESS_DELETE_BATCH : DELETE_BATCH;
 
-  for (let i = 0; i < objects.length; i += DELETE_BATCH) {
-    const batch = objects.slice(i, i + DELETE_BATCH);
+  for (let i = 0; i < objects.length; i += batchSize) {
+    const batch = objects.slice(i, i + batchSize);
     const response = await connection.send(
       new DeleteObjectsCommand({
         Bucket: bucketName,
@@ -76,6 +85,7 @@ async function deleteObjectIdentifiers(
     }
 
     deletedCount += response.Deleted?.length ?? batch.length;
+    onProgress?.(deletedCount, total);
   }
 
   return deletedCount;
@@ -199,23 +209,6 @@ async function abortIncompleteMultipartUploads(
   return abortedCount;
 }
 
-async function deleteAllVersionedObjects(
-  connection: S3Client,
-  bucketName: string,
-  prefix?: string,
-): Promise<number> {
-  let deletedCount = 0;
-
-  while (true) {
-    const objects = await listVersionedObjectPage(connection, bucketName, prefix);
-    if (objects.length === 0) {break;}
-
-    deletedCount += await deleteObjectIdentifiers(connection, bucketName, objects);
-  }
-
-  return deletedCount;
-}
-
 export async function previewObjectDeletion(
   connection: S3Client,
   bucketName: string,
@@ -336,6 +329,7 @@ export async function executeObjectDeletion(
   bucketName: string,
   key: string,
   isFolder: boolean,
+  onProgress?: DeleteProgressCallback,
 ): Promise<{ deletedCount: number }> {
   if (!key || key.includes("..")) {
     throw createError({
@@ -398,6 +392,7 @@ export async function executeObjectDeletion(
     connection,
     bucketName,
     keys.map(key => ({ Key: key })),
+    onProgress,
   );
 
   return { deletedCount };
@@ -458,8 +453,34 @@ export async function previewBucketEmpty(
 export async function executeBucketEmpty(
   connection: S3Client,
   bucketName: string,
+  onProgress?: DeleteProgressCallback,
+  estimatedTotal = 0,
 ): Promise<{ deletedCount: number }> {
-  let deletedCount = await deleteAllVersionedObjects(connection, bucketName);
+  let deletedCount = 0;
+
+  const deleteObjects = async (objects: S3ObjectIdentifier[]) => {
+    if (objects.length === 0) {return;}
+
+    const batchStart = deletedCount;
+    deletedCount += await deleteObjectIdentifiers(
+      connection,
+      bucketName,
+      objects,
+      (deletedInBatch) => {
+        onProgress?.(
+          batchStart + deletedInBatch,
+          estimatedTotal || batchStart + deletedInBatch,
+        );
+      },
+    );
+    onProgress?.(deletedCount, estimatedTotal || deletedCount);
+  };
+
+  while (true) {
+    const objects = await listVersionedObjectPage(connection, bucketName);
+    if (objects.length === 0) {break;}
+    await deleteObjects(objects);
+  }
 
   while (true) {
     const resp = await connection.send(
@@ -475,14 +496,11 @@ export async function executeBucketEmpty(
 
     if (keys.length === 0) {break;}
 
-    deletedCount += await deleteObjectIdentifiers(
-      connection,
-      bucketName,
-      keys.map(key => ({ Key: key })),
-    );
+    await deleteObjects(keys.map(key => ({ Key: key })));
   }
 
   deletedCount += await abortIncompleteMultipartUploads(connection, bucketName);
+  onProgress?.(deletedCount, estimatedTotal || deletedCount);
 
   return { deletedCount };
 }

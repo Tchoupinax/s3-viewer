@@ -39,6 +39,15 @@
     <BucketEmptyWaitingModal
       :open="emptyBucketDeleting"
       :bucket-name="emptyBucketWaitingBucketName"
+      :deleted="emptyBucketProgressDeleted"
+      :total="emptyBucketProgressTotal"
+    />
+
+    <FolderDeleteProgressModal
+      :open="folderDeleteProgressOpen"
+      :folder-path="folderDeleteProgressPath"
+      :deleted="folderDeleteProgressDeleted"
+      :total="folderDeleteProgressTotal"
     />
 
     <div
@@ -429,6 +438,7 @@ import { onMounted,ref } from "vue";
 import BucketEmptyWaitingModal from "~/components/bucket-empty-waiting-modal.vue";
 import type { DeletePreviewPayload } from "~/components/delete-object-dialog.vue";
 import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
+import FolderDeleteProgressModal from "~/components/folder-delete-progress-modal.client.vue";
 import type { EmptyBucketPreviewPayload } from "~/components/empty-bucket-dialog.vue";
 import EmptyBucketDialog from "~/components/empty-bucket-dialog.vue";
 import ReadOnlyErrorDialog from "~/components/read-only-error-dialog.vue";
@@ -474,6 +484,10 @@ const deletePreview = ref<DeletePreviewPayload | null>(null);
 const deletePreviewError = ref<string | null>(null);
 const deleteDeleting = ref(false);
 const deleteTargetNode = ref<FileNode | null>(null);
+const folderDeleteProgressOpen = ref(false);
+const folderDeleteProgressPath = ref<string | null>(null);
+const folderDeleteProgressDeleted = ref(0);
+const folderDeleteProgressTotal = ref(0);
 
 const emptyBucketDialogOpen = ref(false);
 const emptyBucketPreviewLoading = ref(false);
@@ -481,6 +495,8 @@ const emptyBucketPreview = ref<EmptyBucketPreviewPayload | null>(null);
 const emptyBucketPreviewError = ref<string | null>(null);
 const emptyBucketDeleting = ref(false);
 const emptyBucketWaitingBucketName = ref<string | null>(null);
+const emptyBucketProgressDeleted = ref(0);
+const emptyBucketProgressTotal = ref(0);
 
 const selectedBucketReadOnly = ref(false);
 const selectedBucketReadOnlyReason = ref<string | null>(null);
@@ -598,26 +614,66 @@ async function confirmDelete() {
   if (!selectedBucketId.value || !deleteTargetNode.value) {return;}
   deleteDeleting.value = true;
   deletePreviewError.value = null;
+
+  const node = deleteTargetNode.value;
+  const showFolderProgress =
+    node.isFolder && (deletePreview.value?.objectCount ?? 0) > 0;
+
+  if (showFolderProgress) {
+    folderDeleteProgressPath.value = node.fullPath;
+    folderDeleteProgressDeleted.value = 0;
+    folderDeleteProgressTotal.value = deletePreview.value?.objectCount ?? 0;
+    deleteDialogOpen.value = false;
+    folderDeleteProgressOpen.value = true;
+  }
+
   try {
-    const node = deleteTargetNode.value;
-    await $fetch(`/api/buckets/${selectedBucketId.value}/objects/delete`, {
-      method: "DELETE",
-      body: { key: node.fullPath, isFolder: node.isFolder },
-    });
+    if (showFolderProgress) {
+      const { deleteWithProgress } = await import("~/utils/delete-progress");
+      await deleteWithProgress(
+        `/api/buckets/${selectedBucketId.value}/objects/delete-progress`,
+        {
+          key: node.fullPath,
+          isFolder: true,
+          total: deletePreview.value?.objectCount ?? 0,
+        },
+        (deleted, total) => {
+          folderDeleteProgressDeleted.value = deleted;
+          folderDeleteProgressTotal.value = total;
+        },
+      );
+    } else {
+      await $fetch(`/api/buckets/${selectedBucketId.value}/objects/delete`, {
+        method: "DELETE",
+        body: { key: node.fullPath, isFolder: node.isFolder },
+      });
+    }
+
     if (displayedFile.value?.filename === node.fullPath) {
       displayedFile.value = null;
     }
     closeDeleteDialog();
     await refreshDocuments();
   } catch (e: unknown) {
+    if (showFolderProgress) {
+      folderDeleteProgressOpen.value = false;
+      if (isReadOnlyFetchError(e)) {
+        closeDeleteDialog();
+      } else {
+        deleteDialogOpen.value = true;
+      }
+    }
+
     handleWriteError(
       e,
       "Delete failed",
       deletePreviewError,
-      closeDeleteDialog,
+      showFolderProgress ? undefined : closeDeleteDialog,
     );
   } finally {
     deleteDeleting.value = false;
+    folderDeleteProgressOpen.value = false;
+    folderDeleteProgressPath.value = null;
   }
 }
 
@@ -651,14 +707,22 @@ async function confirmEmptyBucket() {
   if (!selectedBucketId.value) {return;}
 
   emptyBucketWaitingBucketName.value = emptyBucketPreview.value?.bucketName ?? null;
+  emptyBucketProgressDeleted.value = 0;
+  emptyBucketProgressTotal.value = emptyBucketPreview.value?.objectCount ?? 0;
   emptyBucketPreviewError.value = null;
   emptyBucketDialogOpen.value = false;
   emptyBucketDeleting.value = true;
 
   try {
-    await $fetch(`/api/buckets/${selectedBucketId.value}/empty`, {
-      method: "DELETE",
-    });
+    const { emptyBucketWithProgress } = await import("~/utils/delete-progress");
+    await emptyBucketWithProgress(
+      `/api/buckets/${selectedBucketId.value}/empty-progress`,
+      emptyBucketProgressTotal.value,
+      (deleted, total) => {
+        emptyBucketProgressDeleted.value = deleted;
+        emptyBucketProgressTotal.value = total;
+      },
+    );
     displayedFile.value = null;
     closeEmptyBucketDialog();
     await refreshDocuments();
@@ -680,6 +744,8 @@ async function confirmEmptyBucket() {
   } finally {
     emptyBucketDeleting.value = false;
     emptyBucketWaitingBucketName.value = null;
+    emptyBucketProgressDeleted.value = 0;
+    emptyBucketProgressTotal.value = 0;
   }
 }
 
