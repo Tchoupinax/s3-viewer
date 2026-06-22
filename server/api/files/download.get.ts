@@ -2,9 +2,10 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
 import { extractGenerateBucketIdentity } from "~/functions/bucket-identity-number";
+import { getEventQuery } from "~/server/utils/event-query";
 
 export default defineEventHandler(async event => {
-  const query = getQuery(event);
+  const query = getEventQuery(event);
   const fullPath = decodeURIComponent(
     Buffer.from(query.file as string, "base64").toString("utf8"),
   );

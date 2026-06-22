@@ -172,6 +172,20 @@
             <span class="font-mono font-semibold text-slate-900">{{ bucketName }}</span>
           </p>
 
+          <p
+            v-if="total > 0"
+            class="mt-4 text-3xl font-semibold tabular-nums text-slate-900"
+          >
+            {{ deleted.toLocaleString() }} / {{ total.toLocaleString() }}
+          </p>
+
+          <p
+            v-if="total > 0"
+            class="mt-1 text-sm text-slate-500"
+          >
+            {{ total === 1 ? "object deleted" : "objects deleted" }}
+          </p>
+
           <p class="mt-3 text-sm text-slate-500 leading-relaxed">
             The princess is clearing the vault. Large buckets can take several minutes — please keep this page open.
           </p>
@@ -192,6 +206,8 @@
 defineProps<{
   open: boolean;
   bucketName?: string | null;
+  deleted: number;
+  total: number;
 }>();
 </script>
 

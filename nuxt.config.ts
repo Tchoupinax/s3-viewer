@@ -8,6 +8,10 @@ export default defineNuxtConfig({
   },
   nitro: {
     minify: true,
+    routeRules: {
+      "/api/buckets/**/empty-progress": { compress: false },
+      "/api/buckets/**/delete-progress": { compress: false },
+    },
   },
   modules: [
     "@nuxt/a11y",
@@ -19,9 +23,10 @@ export default defineNuxtConfig({
   vite: {
     optimizeDeps: {
       include: [
-        "pretty-bytes",
-        "timeago.js",
-        "ts-pattern",
+        'pretty-bytes',
+        'shikiji',
+        'timeago.js',
+        'ts-pattern',
       ],
     },
   },

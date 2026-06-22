@@ -1,6 +1,7 @@
 import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
 import { extractGenerateBucketIdentity } from "~/functions/bucket-identity-number";
 import type { S3ViewerResponse } from "~/server/types/response";
+import { readEventJsonBody } from "~/server/utils/event-query";
 import { connections } from "~/server/utils/s3";
 import { executeObjectDeletion } from "~/server/utils/s3-objects";
 import {
@@ -16,7 +17,7 @@ export default defineEventHandler(
       event,
       "id",
     ) as BucketIdentityNumber;
-    const body = await readBody<{
+    const body = await readEventJsonBody<{
       key?: string;
       isFolder?: boolean;
     }>(event);

@@ -10,6 +10,7 @@ import {
 import type { S3ViewerDocument } from "~/server/types/document";
 import type { FileNode } from "~/server/types/file-node";
 import { buildFileTree } from "~/server/types/file-node";
+import { getEventQuery } from "~/server/utils/event-query";
 import { connections } from "~/server/utils/s3";
 
 export default defineEventHandler(
@@ -28,7 +29,7 @@ export default defineEventHandler(
       event,
       "id",
     ) as BucketIdentityNumber;
-    const query = getQuery(event);
+    const query = getEventQuery(event);
 
     const pageSize = 1000;
     const cursor = query.cursor as string | undefined;
