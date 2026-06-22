@@ -53,8 +53,6 @@
 </template>
 
 <script lang="ts">
-import { getHighlighter } from "shikiji";
-
 function processLangs(title: string) {
   if (title?.endsWith(".js")) {
     return ["javascript"];
@@ -125,6 +123,7 @@ export default {
     }
 
     if (this.type !== "pdf") {
+      const { getHighlighter } = await import("shikiji");
       const shiki = await getHighlighter({
         themes: ["nord", "dark-plus"],
         langs: processLangs(this.filename),

@@ -25,7 +25,7 @@ jobs:
     - name: Build application 🦫
       uses: tchoupinax/repo-config/shared-actions/steps/node/build@v0
       with:
-        nodeVersion: 25
+        nodeVersion: 26
 
     - name: Get current date
       id: date

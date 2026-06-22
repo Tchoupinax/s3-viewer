@@ -1,7 +1,11 @@
-FROM node:25-alpine
+FROM gcr.io/distroless/nodejs26-debian13:nonroot
 
 WORKDIR /app
 
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000
+
 COPY .output /app/output
 
-CMD ["node", "output/server/index.mjs"]
+CMD ["output/server/index.mjs"]

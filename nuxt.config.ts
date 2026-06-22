@@ -1,13 +1,20 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+const isDev = process.env.NODE_ENV !== "production";
+
 export default defineNuxtConfig({
+  sourcemap: {
+    server: false,
+    client: false,
+  },
+  nitro: {
+    minify: true,
+  },
   modules: [
     "@nuxt/a11y",
-    "@nuxt/eslint",
-    "@nuxt/hints",
-    "@nuxt/icon",
+    ...(isDev ? ["@nuxt/eslint", "@nuxt/hints"] : []),
     "@nuxtjs/tailwindcss",
   ],
-  devtools: { enabled: process.env.NODE_ENV !== "production" },
+  devtools: { enabled: false },
   compatibilityDate: "2025-07-15",
   vite: {
     optimizeDeps: {
@@ -15,17 +22,18 @@ export default defineNuxtConfig({
         "pretty-bytes",
         "timeago.js",
         "ts-pattern",
-        "shikiji",
       ],
     },
   },
-  hints: {
-    features: {
-      hydration: false,
-      lazyLoad: false,
-      webVitals: false,
-      thirdPartyScripts: false,
-      htmlValidate: false,
-    },
-  },
+  hints: isDev
+    ? {
+      features: {
+        hydration: false,
+        lazyLoad: false,
+        webVitals: false,
+        thirdPartyScripts: false,
+        htmlValidate: false,
+      },
+    }
+    : undefined,
 });
