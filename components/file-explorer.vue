@@ -49,22 +49,27 @@
             tabindex="0"
             class="flex items-center justify-between w-full px-3 py-2 text-sm transition rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
             :class="{
-              'bg-sky-50/80 text-sky-800 ring-1 ring-sky-100': selectedIndex === index,
-              'hover:bg-slate-50 text-slate-700': selectedIndex !== index,
+              'bg-sky-50/80 text-sky-800 ring-1 ring-sky-100': selectedIndex === index && !isPathSelected(file.fullPath),
+              'bg-sky-100/90 text-sky-900 ring-1 ring-sky-200': isPathSelected(file.fullPath),
+              'hover:bg-slate-50 text-slate-700': selectedIndex !== index && !isPathSelected(file.fullPath),
             }"
-            @click="
-              file.isFolder
-                ? enterDirectory(file.name)
-                : openFile(file.fullPath)
-            "
-            @keydown.enter.prevent="
-              file.isFolder
-                ? enterDirectory(file.name)
-                : openFile(file.fullPath)
-            "
+            @click="onRowClick(file, $event)"
+            @keydown.enter.prevent="onRowEnter(file)"
           >
-            <!-- Name -->
             <div class="flex items-center min-w-0 gap-2 truncate">
+              <label
+                v-if="allowSelect"
+                class="inline-flex items-center shrink-0"
+                @click.stop
+              >
+                <input
+                  type="checkbox"
+                  class="rounded border-slate-300 text-sky-600 focus:ring-sky-500/30"
+                  :checked="isPathSelected(file.fullPath)"
+                  @change="emit('toggle-select', file)"
+                >
+              </label>
+
               <IconFolder
                 v-if="file.isFolder"
                 class="text-amber-500/90 shrink-0 size-5"
@@ -145,12 +150,20 @@ const emit = defineEmits([
   "openFile",
   "uploadFiles",
   "request-delete",
+  "select-node",
+  "toggle-select",
+  "clear-selection",
 ]);
 const props = defineProps({
   currentDirectory: { type: String, required: true },
   currentLevel: { type: Number, required: true },
   displayUploadButton: Boolean,
   allowDelete: { type: Boolean, default: true },
+  allowSelect: { type: Boolean, default: false },
+  selectedPaths: {
+    type: Object as PropType<Set<string>>,
+    default: () => new Set<string>(),
+  },
   files: { type: Array as PropType<Array<FileNode>>, required: true },
   filesCount: Number,
 });
@@ -180,6 +193,38 @@ const enterDirectory = (folderName: string) => {
 const openFile = (filePath: string) => {
   emit("openFile", filePath);
 };
+
+function isPathSelected(path: string) {
+  return props.selectedPaths.has(path);
+}
+
+function onRowClick(file: FileNode, event: MouseEvent) {
+  if (
+    props.allowSelect
+    && (event.shiftKey || event.ctrlKey || event.metaKey)
+  ) {
+    emit("select-node", file, event);
+    return;
+  }
+
+  emit("clear-selection");
+
+  if (file.isFolder) {
+    enterDirectory(file.name);
+  } else {
+    openFile(file.fullPath);
+  }
+}
+
+function onRowEnter(file: FileNode) {
+  emit("clear-selection");
+
+  if (file.isFolder) {
+    enterDirectory(file.name);
+  } else {
+    openFile(file.fullPath);
+  }
+}
 
 const back = () => {
   const parent = props.currentDirectory.split("/").slice(0, -1).join("/");

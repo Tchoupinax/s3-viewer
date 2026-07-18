@@ -14,6 +14,7 @@
       :open="deleteDialogOpen"
       :loading="deletePreviewLoading"
       :preview="deletePreview"
+      :bulk-previews="deleteBulkPreviews"
       :preview-error="deletePreviewError"
       :deleting="deleteDeleting"
       @close="closeDeleteDialog"
@@ -48,6 +49,9 @@
       :folder-path="folderDeleteProgressPath"
       :deleted="folderDeleteProgressDeleted"
       :total="folderDeleteProgressTotal"
+      :multiple-folders="folderDeleteProgressMultipleFolders"
+      :folder-count="folderDeleteProgressFolderCount"
+      :current-folder-index="folderDeleteProgressCurrentFolderIndex"
     />
 
     <div
@@ -298,6 +302,25 @@
               </span>
 
               <button
+                v-if="selectedCount > 0 && !selectedBucketReadOnly"
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition"
+                @click="clearSelection"
+              >
+                Clear selection
+              </button>
+
+              <button
+                v-if="selectedCount > 0 && !selectedBucketReadOnly"
+                type="button"
+                :disabled="loadingDocuments"
+                class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                @click="openDeleteSelectedDialog"
+              >
+                Delete selected ({{ selectedCount }})
+              </button>
+
+              <button
                 v-if="selectedBucket && selectedBucket.errorMessage === null && !selectedBucketReadOnly"
                 type="button"
                 :disabled="loadingDocuments"
@@ -365,10 +388,15 @@
                 :files-count="documentsCount"
                 :display-upload-button="false"
                 :allow-delete="!selectedBucketReadOnly"
+                :allow-select="!selectedBucketReadOnly"
+                :selected-paths="selectedPaths"
                 @enter-directory="handleDirectoryEntered"
                 @leave-directory="handleDirectoryLeft"
                 @open-file="(filename) => openFile(filename)"
                 @request-delete="openDeleteDialog"
+                @select-node="handleSelectNode"
+                @toggle-select="handleToggleSelect"
+                @clear-selection="clearSelection"
               />
             </template>
 
@@ -383,7 +411,13 @@
                   <span
                     class="tree-view-header-lead"
                     aria-hidden="true"
-                  />
+                  >
+                    <span
+                      v-if="!selectedBucketReadOnly"
+                      class="tree-view-header-checkbox"
+                      aria-hidden="true"
+                    />
+                  </span>
                   <span class="tree-view-header-name">Name</span>
                   <div class="tree-view-header-actions">
                     <span class="tree-view-col-size">Size</span>
@@ -404,13 +438,18 @@
                   <DocumentsTreeNode
                     :node="node"
                     :collapsed-paths="treeCollapsedPaths"
+                    :selected-paths="selectedPaths"
                     :format-size="formatSize"
                     :format-date="format"
                     :count-files="countFilesInNode"
                     :allow-delete="!selectedBucketReadOnly"
+                    :allow-select="!selectedBucketReadOnly"
                     @toggle="toggleTreePath"
                     @open-file="openFile"
                     @request-delete="openDeleteDialog"
+                    @select-node="handleSelectNode"
+                    @toggle-select="handleToggleSelect"
+                    @clear-selection="clearSelection"
                   />
                 </div>
               </div>
@@ -433,7 +472,7 @@
 import prettyBytes from "pretty-bytes";
 import { format } from "timeago.js";
 import { match } from "ts-pattern";
-import { onMounted,ref } from "vue";
+import { onMounted, ref, watch, computed } from "vue";
 
 import BucketEmptyWaitingModal from "~/components/bucket-empty-waiting-modal.vue";
 import type { DeletePreviewPayload } from "~/components/delete-object-dialog.vue";
@@ -448,6 +487,13 @@ import type {
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { FileNode } from "~/server/types/file-node";
 import { getFetchErrorMessage, isReadOnlyFetchError } from "~/utils/api-error";
+import {
+  dedupeNestedSelection,
+  flattenVisibleTree,
+  nodesFromPaths,
+  pruneSelectionPaths,
+  selectRangeInList,
+} from "~/utils/document-selection";
 
 const $router = useRouter();
 const $route = useRoute();
@@ -483,11 +529,15 @@ const deletePreviewLoading = ref(false);
 const deletePreview = ref<DeletePreviewPayload | null>(null);
 const deletePreviewError = ref<string | null>(null);
 const deleteDeleting = ref(false);
-const deleteTargetNode = ref<FileNode | null>(null);
+const deleteTargetNodes = ref<FileNode[]>([]);
+const deleteBulkPreviews = ref<DeletePreviewPayload[]>([]);
 const folderDeleteProgressOpen = ref(false);
 const folderDeleteProgressPath = ref<string | null>(null);
 const folderDeleteProgressDeleted = ref(0);
 const folderDeleteProgressTotal = ref(0);
+const folderDeleteProgressMultipleFolders = ref(false);
+const folderDeleteProgressFolderCount = ref(0);
+const folderDeleteProgressCurrentFolderIndex = ref(0);
 
 const emptyBucketDialogOpen = ref(false);
 const emptyBucketPreviewLoading = ref(false);
@@ -502,6 +552,99 @@ const selectedBucketReadOnly = ref(false);
 const selectedBucketReadOnlyReason = ref<string | null>(null);
 const readOnlyErrorOpen = ref(false);
 const readOnlyErrorMessage = ref("");
+
+const selectedPaths = ref<Set<string>>(new Set());
+const selectionAnchorPath = ref<string | null>(null);
+
+const selectedCount = computed(() => selectedPaths.value.size);
+
+function sortFilesForList(files: FileNode[]): FileNode[] {
+  return [...files].sort((a, b) => {
+    if (a.isFolder && !b.isFolder) {return -1;}
+    if (!a.isFolder && b.isFolder) {return 1;}
+    return a.name.localeCompare(b.name);
+  });
+}
+
+const selectableListItems = computed(() => {
+  if (documentsViewMode.value === "tree") {
+    return flattenVisibleTree(documents.value, treeCollapsedPaths.value);
+  }
+  return sortFilesForList(currentFiles.value);
+});
+
+function clearSelection() {
+  selectedPaths.value = new Set();
+  selectionAnchorPath.value = null;
+}
+
+function togglePathSelection(path: string) {
+  const next = new Set(selectedPaths.value);
+  if (next.has(path)) {next.delete(path);} else {next.add(path);}
+  selectedPaths.value = next;
+}
+
+function handleToggleSelect(node: FileNode) {
+  togglePathSelection(node.fullPath);
+  selectionAnchorPath.value = node.fullPath;
+}
+
+function handleSelectNode(node: FileNode, event: MouseEvent) {
+  const extend = event.ctrlKey || event.metaKey;
+  const anchor = selectionAnchorPath.value;
+
+  if (event.shiftKey && anchor) {
+    selectedPaths.value = selectRangeInList(
+      selectableListItems.value,
+      anchor,
+      node.fullPath,
+      selectedPaths.value,
+      !extend,
+    );
+    selectionAnchorPath.value = node.fullPath;
+    return;
+  }
+
+  if (extend && anchor && anchor !== node.fullPath) {
+    selectedPaths.value = selectRangeInList(
+      selectableListItems.value,
+      anchor,
+      node.fullPath,
+      selectedPaths.value,
+      false,
+    );
+    selectionAnchorPath.value = node.fullPath;
+    return;
+  }
+
+  if (extend) {
+    togglePathSelection(node.fullPath);
+    selectionAnchorPath.value = node.fullPath;
+    return;
+  }
+
+  selectedPaths.value = new Set([node.fullPath]);
+  selectionAnchorPath.value = node.fullPath;
+}
+
+function getSelectedNodes(): FileNode[] {
+  return nodesFromPaths(documents.value, selectedPaths.value);
+}
+
+watch(documents, () => {
+  selectedPaths.value = pruneSelectionPaths(
+    documents.value,
+    selectedPaths.value,
+  );
+});
+
+watch(selectedBucketId, () => {
+  clearSelection();
+});
+
+watch(documentsViewMode, () => {
+  clearSelection();
+});
 
 function applyDocumentsResponse(data: {
   files: FileNode[];
@@ -579,28 +722,48 @@ function toggleTreePath(fullPath: string) {
 function closeDeleteDialog() {
   deleteDialogOpen.value = false;
   deletePreview.value = null;
+  deleteBulkPreviews.value = [];
   deletePreviewError.value = null;
-  deleteTargetNode.value = null;
+  deleteTargetNodes.value = [];
 }
 
 async function openDeleteDialog(node: FileNode) {
+  await openDeleteDialogForNodes([node]);
+}
+
+async function openDeleteSelectedDialog() {
+  const nodes = dedupeNestedSelection(getSelectedNodes());
+  if (!nodes.length) {return;}
+  await openDeleteDialogForNodes(nodes);
+}
+
+async function openDeleteDialogForNodes(nodes: FileNode[]) {
   if (!selectedBucketId.value || !guardWriteAccess()) {return;}
-  deleteTargetNode.value = node;
+  deleteTargetNodes.value = nodes;
   deleteDialogOpen.value = true;
   deletePreviewLoading.value = true;
   deletePreview.value = null;
+  deleteBulkPreviews.value = [];
   deletePreviewError.value = null;
   try {
-    const res = await $fetch<{ data: DeletePreviewPayload }>(
-      `/api/buckets/${selectedBucketId.value}/objects/preview`,
-      {
-        query: {
-          key: node.fullPath,
-          isFolder: node.isFolder ? "1" : "0",
-        },
-      },
+    const previews = await Promise.all(
+      nodes.map(node =>
+        $fetch<{ data: DeletePreviewPayload }>(
+          `/api/buckets/${selectedBucketId.value}/objects/preview`,
+          {
+            query: {
+              key: node.fullPath,
+              isFolder: node.isFolder ? "1" : "0",
+            },
+          },
+        ).then(res => res.data),
+      ),
     );
-    deletePreview.value = res.data;
+    if (previews.length === 1) {
+      deletePreview.value = previews[0] ?? null;
+    } else {
+      deleteBulkPreviews.value = previews;
+    }
   } catch (e: unknown) {
     const err = e as { data?: { statusMessage?: string }; message?: string };
     deletePreviewError.value =
@@ -611,69 +774,116 @@ async function openDeleteDialog(node: FileNode) {
 }
 
 async function confirmDelete() {
-  if (!selectedBucketId.value || !deleteTargetNode.value) {return;}
+  const nodes = deleteTargetNodes.value;
+  if (!selectedBucketId.value || !nodes.length) {return;}
   deleteDeleting.value = true;
   deletePreviewError.value = null;
 
-  const node = deleteTargetNode.value;
-  const showFolderProgress =
-    node.isFolder && (deletePreview.value?.objectCount ?? 0) > 0;
+  const previews =
+    deleteBulkPreviews.value.length > 0
+      ? deleteBulkPreviews.value
+      : deletePreview.value
+        ? [deletePreview.value]
+        : [];
 
-  if (showFolderProgress) {
-    folderDeleteProgressPath.value = node.fullPath;
-    folderDeleteProgressDeleted.value = 0;
-    folderDeleteProgressTotal.value = deletePreview.value?.objectCount ?? 0;
+  const grandTotal = previews.reduce(
+    (sum, preview) => sum + (preview?.objectCount ?? 0),
+    0,
+  );
+
+  const folderDeleteJobs = nodes
+    .map((node, index) => ({ node, preview: previews[index] }))
+    .filter(
+      ({ node, preview }) =>
+        node.isFolder && (preview?.objectCount ?? 0) > 0,
+    );
+
+  const hasFolderDeletes = folderDeleteJobs.length > 0;
+  const multipleFolders = folderDeleteJobs.length > 1;
+
+  if (hasFolderDeletes) {
     deleteDialogOpen.value = false;
     folderDeleteProgressOpen.value = true;
+    folderDeleteProgressTotal.value = grandTotal;
+    folderDeleteProgressDeleted.value = 0;
+    folderDeleteProgressPath.value = null;
+    folderDeleteProgressMultipleFolders.value = multipleFolders;
+    folderDeleteProgressFolderCount.value = folderDeleteJobs.length;
+    folderDeleteProgressCurrentFolderIndex.value = 0;
   }
 
   try {
-    if (showFolderProgress) {
-      const { deleteWithProgress } = await import("~/utils/delete-progress");
-      await deleteWithProgress(
-        `/api/buckets/${selectedBucketId.value}/objects/delete-progress`,
-        {
-          key: node.fullPath,
-          isFolder: true,
-          total: deletePreview.value?.objectCount ?? 0,
-        },
-        (deleted, total) => {
-          folderDeleteProgressDeleted.value = deleted;
-          folderDeleteProgressTotal.value = total;
-        },
-      );
-    } else {
-      await $fetch(`/api/buckets/${selectedBucketId.value}/objects/delete`, {
-        method: "DELETE",
-        body: { key: node.fullPath, isFolder: node.isFolder },
-      });
+    const { deleteWithProgress } = await import("~/utils/delete-progress");
+
+    let completedObjects = 0;
+    let folderJobIndex = 0;
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i]!;
+      const preview = previews[i];
+      const objectCount = preview?.objectCount ?? 0;
+      const showFolderProgress = node.isFolder && objectCount > 0;
+
+      if (showFolderProgress) {
+        folderJobIndex += 1;
+        folderDeleteProgressPath.value = node.fullPath;
+        folderDeleteProgressCurrentFolderIndex.value = folderJobIndex;
+
+        await deleteWithProgress(
+          `/api/buckets/${selectedBucketId.value}/objects/delete-progress`,
+          {
+            key: node.fullPath,
+            isFolder: true,
+            total: objectCount,
+          },
+          deleted => {
+            folderDeleteProgressDeleted.value = completedObjects + deleted;
+          },
+        );
+
+        completedObjects += objectCount;
+        folderDeleteProgressDeleted.value = completedObjects;
+      } else if (objectCount !== 0) {
+        await $fetch(`/api/buckets/${selectedBucketId.value}/objects/delete`, {
+          method: "DELETE",
+          body: { key: node.fullPath, isFolder: node.isFolder },
+        });
+
+        completedObjects += objectCount;
+        if (hasFolderDeletes) {
+          folderDeleteProgressDeleted.value = completedObjects;
+        }
+      }
+
+      if (displayedFile.value?.filename === node.fullPath) {
+        displayedFile.value = null;
+      }
     }
 
-    if (displayedFile.value?.filename === node.fullPath) {
-      displayedFile.value = null;
-    }
+    clearSelection();
     closeDeleteDialog();
+    folderDeleteProgressOpen.value = false;
     await refreshDocuments();
   } catch (e: unknown) {
-    if (showFolderProgress) {
-      folderDeleteProgressOpen.value = false;
-      if (isReadOnlyFetchError(e)) {
-        closeDeleteDialog();
-      } else {
-        deleteDialogOpen.value = true;
-      }
+    folderDeleteProgressOpen.value = false;
+
+    if (hasFolderDeletes) {
+      deleteDialogOpen.value = true;
     }
 
     handleWriteError(
       e,
       "Delete failed",
       deletePreviewError,
-      showFolderProgress ? undefined : closeDeleteDialog,
+      hasFolderDeletes ? undefined : closeDeleteDialog,
     );
   } finally {
     deleteDeleting.value = false;
     folderDeleteProgressOpen.value = false;
     folderDeleteProgressPath.value = null;
+    folderDeleteProgressMultipleFolders.value = false;
+    folderDeleteProgressFolderCount.value = 0;
+    folderDeleteProgressCurrentFolderIndex.value = 0;
   }
 }
 
@@ -910,7 +1120,8 @@ onMounted(() => {
 
 <style scoped>
 .tree-view {
-  --tree-lead-width: 2.875rem;
+  --tree-col-checkbox: 1.125rem;
+  --tree-lead-width: 4rem;
   --tree-col-size: 4.25rem;
   --tree-col-meta: 5.25rem;
   --tree-col-delete: 1.5rem;
@@ -924,6 +1135,16 @@ onMounted(() => {
     var(--tree-col-size) + var(--tree-col-gap) + var(--tree-col-meta)
   );
   padding: 0.25rem 0.25rem 0.25rem 0.5rem;
+}
+
+.tree-view-readonly {
+  --tree-lead-width: 2.875rem;
+}
+
+.tree-view-header-checkbox {
+  display: inline-block;
+  width: var(--tree-col-checkbox);
+  height: 0.875rem;
 }
 
 .tree-view-header {

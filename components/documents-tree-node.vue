@@ -2,9 +2,23 @@
   <div class="tree-node">
     <div
       class="tree-node-row group"
+      :class="{ 'tree-node-row-selected': isSelected }"
       :style="{ paddingLeft: `${(node.level - 1) * 20}px` }"
       @click="onRowClick"
     >
+      <label
+        v-if="allowSelect"
+        class="tree-node-checkbox"
+        @click.stop
+      >
+        <input
+          type="checkbox"
+          class="tree-node-checkbox-input"
+          :checked="isSelected"
+          @change="emit('toggle-select', node)"
+        >
+      </label>
+
       <div class="tree-node-chevron-slot">
         <button
           v-if="node.isFolder"
@@ -99,13 +113,18 @@
         :key="child.fullPath"
         :node="child"
         :collapsed-paths="props.collapsedPaths"
+        :selected-paths="props.selectedPaths"
         :format-size="formatSize"
         :format-date="formatDate"
         :count-files="countFiles"
         :allow-delete="allowDelete"
+        :allow-select="allowSelect"
         @toggle="emit('toggle', $event)"
         @open-file="emit('open-file', $event)"
         @request-delete="emit('request-delete', $event)"
+        @select-node="(node, event) => emit('select-node', node, event)"
+        @toggle-select="emit('toggle-select', $event)"
+        @clear-selection="emit('clear-selection')"
       />
     </template>
   </div>
@@ -120,16 +139,21 @@ import type { FileNode } from "~/server/types/file-node";
 const props = defineProps<{
   node: FileNode;
   collapsedPaths: Set<string>;
+  selectedPaths: Set<string>;
   formatSize: (size: number) => string;
   formatDate: (date: Date | null) => string;
   countFiles: (node: FileNode) => number;
   allowDelete?: boolean;
+  allowSelect?: boolean;
 }>();
 
 const emit = defineEmits<{
   toggle: [fullPath: string];
   "open-file": [fullPath: string];
   "request-delete": [node: FileNode];
+  "select-node": [node: FileNode, event: MouseEvent];
+  "toggle-select": [node: FileNode];
+  "clear-selection": [];
 }>();
 
 const isExpanded = computed(
@@ -137,8 +161,20 @@ const isExpanded = computed(
 );
 
 const allowDelete = computed(() => props.allowDelete ?? true);
+const allowSelect = computed(() => props.allowSelect ?? false);
+const isSelected = computed(() => props.selectedPaths.has(props.node.fullPath));
 
-function onRowClick() {
+function onRowClick(event: MouseEvent) {
+  if (
+    allowSelect.value
+    && (event.shiftKey || event.ctrlKey || event.metaKey)
+  ) {
+    emit("select-node", props.node, event);
+    return;
+  }
+
+  emit("clear-selection");
+
   if (props.node.isFolder) {
     emit("toggle", props.node.fullPath);
   } else {
@@ -160,6 +196,34 @@ function onRowClick() {
 
 .tree-node-row:hover {
   background-color: rgb(248 250 252);
+}
+
+.tree-node-row-selected {
+  background-color: rgb(224 242 254 / 0.85);
+}
+
+.tree-node-row-selected:hover {
+  background-color: rgb(186 230 253 / 0.85);
+}
+
+.tree-node-checkbox {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tree-col-checkbox, 1.125rem);
+  height: 1.125rem;
+  cursor: pointer;
+}
+
+.tree-node-checkbox-input {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: 0;
+  border-radius: 0.25rem;
+  border-color: rgb(203 213 225);
+  color: rgb(14 165 233);
+  cursor: pointer;
 }
 
 .tree-node-chevron-slot {
