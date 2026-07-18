@@ -43,12 +43,12 @@
               {{ previewError }}
             </p>
 
-            <template v-if="preview">
+            <template v-if="effectivePreview">
               <p
-                v-if="preview.objectCount === 0"
+                v-if="effectivePreview.objectCount === 0"
                 class="text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2"
               >
-                No objects match this path in the bucket. Nothing to delete.
+                No objects match the selected paths. Nothing to delete.
               </p>
 
               <div
@@ -64,69 +64,87 @@
                   Bucket
                 </dt>
                 <dd class="font-medium text-slate-900 break-all">
-                  {{ preview.bucketName }}
+                  {{ effectivePreview.bucketName }}
                 </dd>
 
-                <dt class="text-slate-500">
-                  Type
-                </dt>
-                <dd class="font-medium text-slate-900">
-                  {{ preview.kind === "folder" ? "Folder (prefix)" : "Object" }}
-                </dd>
+                <template v-if="isBulk">
+                  <dt class="text-slate-500">
+                    Selection
+                  </dt>
+                  <dd class="font-medium text-slate-900">
+                    {{ bulkPreviews!.length.toLocaleString() }} items
+                  </dd>
+                </template>
 
-                <dt class="text-slate-500">
-                  Key
-                </dt>
-                <dd class="font-mono text-xs text-slate-800 break-all">
-                  {{ preview.key }}
-                </dd>
+                <template v-else>
+                  <dt class="text-slate-500">
+                    Type
+                  </dt>
+                  <dd class="font-medium text-slate-900">
+                    {{ effectivePreview.kind === "folder" ? "Folder (prefix)" : "Object" }}
+                  </dd>
+
+                  <dt class="text-slate-500">
+                    Key
+                  </dt>
+                  <dd class="font-mono text-xs text-slate-800 break-all">
+                    {{ effectivePreview.key }}
+                  </dd>
+                </template>
 
                 <dt class="text-slate-500">
                   Objects
                 </dt>
                 <dd class="font-medium text-slate-900">
-                  {{ preview.objectCount.toLocaleString() }}
+                  {{ effectivePreview.objectCount.toLocaleString() }}
                 </dd>
 
                 <dt class="text-slate-500">
                   Total size
                 </dt>
                 <dd class="font-medium text-slate-900 tabular-nums">
-                  {{ preview.totalSizeHuman }}
+                  {{ effectivePreview.totalSizeHuman }}
                   <span class="text-slate-500 font-normal">
-                    ({{ preview.totalSizeBytes.toLocaleString() }} bytes)
+                    ({{ effectivePreview.totalSizeBytes.toLocaleString() }} bytes)
                   </span>
-                </dd>
-
-                <dt
-                  v-if="preview.kind === 'file' && preview.lastModified"
-                  class="text-slate-500"
-                >
-                  Last modified
-                </dt>
-                <dd
-                  v-if="preview.kind === 'file' && preview.lastModified"
-                  class="text-slate-800"
-                >
-                  {{ formatIso(preview.lastModified) }}
                 </dd>
               </dl>
 
-              <div v-if="preview.sampleKeys.length">
+              <div v-if="isBulk">
+                <p class="text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5">
+                  Selected paths
+                </p>
+                <ul
+                  class="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1.5 font-mono text-[11px] text-slate-700 space-y-0.5"
+                >
+                  <li
+                    v-for="item in bulkPreviews"
+                    :key="item.key"
+                    class="break-all"
+                  >
+                    {{ item.kind === "folder" ? "[folder] " : "" }}{{ item.key }}
+                    <span class="text-slate-400">
+                      ({{ item.objectCount.toLocaleString() }})
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              <div v-else-if="effectivePreview.sampleKeys.length">
                 <p class="text-xs font-medium uppercase tracking-wide text-slate-500 mb-1.5">
                   Sample keys
                   <span
-                    v-if="preview.listTruncatedForDisplay"
+                    v-if="effectivePreview.listTruncatedForDisplay"
                     class="font-normal normal-case text-slate-400"
                   >
-                    (first {{ preview.sampleKeys.length }} shown)
+                    (first {{ effectivePreview.sampleKeys.length }} shown)
                   </span>
                 </p>
                 <ul
                   class="max-h-32 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1.5 font-mono text-[11px] text-slate-700 space-y-0.5"
                 >
                   <li
-                    v-for="k in preview.sampleKeys"
+                    v-for="k in effectivePreview.sampleKeys"
                     :key="k"
                     class="break-all"
                   >
@@ -140,7 +158,7 @@
 
         <div class="px-5 py-4 border-t border-slate-100 bg-slate-50/60 shrink-0 space-y-3">
           <label
-            v-if="preview && !loading && canSubmit"
+            v-if="effectivePreview && !loading && canSubmit"
             class="flex items-start gap-2 cursor-pointer select-none"
           >
             <input
@@ -149,9 +167,7 @@
               class="mt-0.5 rounded border-slate-300 text-red-600 focus:ring-red-500/30"
             >
             <span class="text-sm text-slate-700">
-              I understand that this will permanently delete
-              {{ preview.kind === "folder" ? "all listed objects under this prefix" : "this object" }}
-              and cannot be undone.
+              {{ acknowledgeText }}
             </span>
           </label>
 
@@ -179,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import prettyBytes from "pretty-bytes";
 import { computed, ref, watch } from "vue";
 
 export type DeletePreviewPayload = {
@@ -197,6 +214,7 @@ const props = defineProps<{
   open: boolean;
   loading: boolean;
   preview: DeletePreviewPayload | null;
+  bulkPreviews?: DeletePreviewPayload[] | null;
   previewError: string | null;
   deleting: boolean;
 }>();
@@ -216,13 +234,50 @@ watch(
 );
 
 watch(
-  () => props.preview,
+  () => [props.preview, props.bulkPreviews],
   () => {
     acknowledged.value = false;
   },
 );
 
+const isBulk = computed(
+  () => (props.bulkPreviews?.length ?? 0) > 1,
+);
+
+const effectivePreview = computed(() => {
+  if (props.bulkPreviews?.length) {
+    const objectCount = props.bulkPreviews.reduce(
+      (sum, item) => sum + item.objectCount,
+      0,
+    );
+    const totalSizeBytes = props.bulkPreviews.reduce(
+      (sum, item) => sum + item.totalSizeBytes,
+      0,
+    );
+    const sampleKeys = props.bulkPreviews
+      .flatMap(item => item.sampleKeys)
+      .slice(0, 40);
+
+    return {
+      kind: "folder" as const,
+      key: "",
+      bucketName: props.bulkPreviews[0]?.bucketName ?? "",
+      objectCount,
+      totalSizeBytes,
+      totalSizeHuman: prettyBytes(totalSizeBytes),
+      lastModified: null,
+      sampleKeys,
+      listTruncatedForDisplay: sampleKeys.length >= 40,
+    };
+  }
+
+  return props.preview;
+});
+
 const title = computed(() => {
+  if (isBulk.value) {
+    return `Delete ${props.bulkPreviews!.length} items`;
+  }
   if (!props.preview) {return "Delete object";}
   return props.preview.kind === "folder"
     ? "Delete folder"
@@ -230,6 +285,9 @@ const title = computed(() => {
 });
 
 const warningText = computed(() => {
+  if (isBulk.value) {
+    return "Every object under the selected paths will be permanently deleted, including all files and subfolders.";
+  }
   if (!props.preview) {return "";}
   if (props.preview.kind === "folder") {
     return "Every object whose key starts with this path will be deleted. Subfolders are included.";
@@ -237,9 +295,23 @@ const warningText = computed(() => {
   return "The object will be removed from the bucket.";
 });
 
+const acknowledgeText = computed(() => {
+  if (isBulk.value) {
+    return "I understand that all selected items and their objects will be permanently deleted and cannot be recovered.";
+  }
+  if (!effectivePreview.value) {return "";}
+  return `I understand that this will permanently delete ${
+    effectivePreview.value.kind === "folder"
+      ? "all listed objects under this prefix"
+      : "this object"
+  } and cannot be undone.`;
+});
+
 const canSubmit = computed(() => {
-  if (!props.preview || props.loading || props.previewError) {return false;}
-  if (props.preview.objectCount === 0) {return false;}
+  if (!effectivePreview.value || props.loading || props.previewError) {
+    return false;
+  }
+  if (effectivePreview.value.objectCount === 0) {return false;}
   return true;
 });
 

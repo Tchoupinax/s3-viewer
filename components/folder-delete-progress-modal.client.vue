@@ -21,8 +21,15 @@
             id="folder-delete-progress-title"
             class="mt-5 text-xl font-semibold text-slate-900"
           >
-            Deleting folder…
+            {{ multipleFolders ? "Deleting folders…" : "Deleting folder…" }}
           </h2>
+
+          <p
+            v-if="multipleFolders && folderCount > 1"
+            class="mt-2 text-sm text-slate-500"
+          >
+            Folder {{ currentFolderIndex }} of {{ folderCount }}
+          </p>
 
           <p
             v-if="folderPath"
@@ -57,5 +64,8 @@ defineProps<{
   folderPath?: string | null;
   deleted: number;
   total: number;
+  multipleFolders?: boolean;
+  folderCount?: number;
+  currentFolderIndex?: number;
 }>();
 </script>
