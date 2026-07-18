@@ -29,10 +29,18 @@ export default defineEventHandler(
             const buckets = await connection
               .send(new ListBucketsCommand({}))
               .then(c => c.Buckets ?? [])
-              .catch(error => {
-                errorMessage = error.message ?? null;
+              .catch((error: unknown) => {
+                errorMessage =
+                  error instanceof Error ? error.message : String(error);
                 return [];
               });
+
+            logAccountConnection(
+              organizationOrAccountName,
+              id,
+              errorMessage,
+              buckets.length,
+            );
 
             return {
               buckets: buckets,
@@ -50,21 +58,38 @@ export default defineEventHandler(
             };
           })(),
           3_000,
-        ).catch(error => ({
+        ).catch((error: unknown) => {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          logAccountConnection(organizationOrAccountName, id, message, 0);
+          return {
           buckets: [] as Array<Bucket>,
           region: null,
           cloudProviderName: null,
           organizationOrAccountName,
           accountId: id,
           connection,
-          errorMessage:
-            error instanceof Error ? error.message : "Timed out after 5s",
-        })),
+          errorMessage: message,
+        };
+        }),
       ),
     );
 
     const buckets = (
-      await Promise.all(commmands.map(command => withTimeout(mapToS3ViewerBuckets(command), 3_000).catch(() => ([defaultS3ViewerBucketToBucket()] satisfies Array<S3ViewerBucket>))))  
+      await Promise.all(
+        commmands.map(command =>
+          withTimeout(mapToS3ViewerBuckets(command), 10_000).catch(
+            (error: unknown) => {
+              const message =
+                error instanceof Error ? error.message : String(error);
+              console.error(
+                `[s3-viewer] Account "${command.organizationOrAccountName}" (${command.accountId}): bucket mapping failed — ${message}`,
+              );
+              return [defaultS3ViewerBucketToBucket()] satisfies Array<S3ViewerBucket>;
+            },
+          ),
+        ),
+      )
     ).flat();
 
     const stats = totalSizeByKey(
@@ -140,11 +165,50 @@ export async function mapToS3ViewerBuckets({
   errorMessage: string | null;
 }): Promise<Array<S3ViewerBucket>> {
   async function mapToS3ViewerBucket(bucket: Bucket): Promise<S3ViewerBucket> {
-    const { size: bucketSize, count: filesCount } =
-      errorMessage === null
-        ? await getBucketSizeAndCount(connection, bucket.Name ?? "")
-        : { size: 0, count: 0 };
+    const bucketName = bucket.Name ?? "_";
 
+    if (errorMessage !== null) {
+      logBucketConnection(
+        bucketName,
+        organizationOrAccountName,
+        false,
+        errorMessage,
+      );
+      return buildBucket({
+        bucket,
+        bucketSize: 0,
+        filesCount: 0,
+      });
+    }
+
+    const { size: bucketSize, count: filesCount, error: bucketError } =
+      await getBucketSizeAndCount(connection, bucketName);
+
+    logBucketConnection(
+      bucketName,
+      organizationOrAccountName,
+      bucketError === null,
+      bucketError,
+      filesCount,
+      bucketSize,
+    );
+
+    return buildBucket({
+      bucket,
+      bucketSize,
+      filesCount,
+    });
+  }
+
+  function buildBucket({
+    bucket,
+    bucketSize,
+    filesCount,
+  }: {
+    bucket: Bucket;
+    bucketSize: number;
+    filesCount: number;
+  }): S3ViewerBucket {
     return {
       id: generateBucketIdentityNumber({
         accountId,
@@ -214,7 +278,7 @@ export async function extractCloudProviderName(
 async function getBucketSizeAndCount(
   connection: S3Client,
   bucketName: string,
-): Promise<{ size: number; count: number }> {
+): Promise<{ size: number; count: number; error: string | null }> {
   let totalSize = 0;
   let totalCount = 0;
   let continuationToken: string | undefined;
@@ -238,10 +302,49 @@ async function getBucketSizeAndCount(
       continuationToken = res.NextContinuationToken;
     } while (continuationToken);
 
-    return { size: totalSize, count: totalCount };
-  } catch (_err) {
-    return { size: 0, count: 0 };
+    return { size: totalSize, count: totalCount, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { size: 0, count: 0, error: message };
   }
+}
+
+function logAccountConnection(
+  accountName: string,
+  accountId: string,
+  errorMessage: string | null,
+  bucketCount: number,
+) {
+  if (errorMessage) {
+    console.error(
+      `[s3-viewer] Account "${accountName}" (${accountId}): failed — ${errorMessage}`,
+    );
+    return;
+  }
+
+  console.log(
+    `[s3-viewer] Account "${accountName}" (${accountId}): succeeded (${bucketCount} bucket(s))`,
+  );
+}
+
+function logBucketConnection(
+  bucketName: string,
+  accountName: string,
+  succeeded: boolean,
+  errorMessage: string | null,
+  filesCount?: number,
+  totalSize?: number,
+) {
+  if (succeeded) {
+    console.log(
+      `[s3-viewer] Bucket "${bucketName}" (${accountName}): succeeded (${filesCount ?? 0} object(s), ${prettyBytes(totalSize ?? 0)})`,
+    );
+    return;
+  }
+
+  console.error(
+    `[s3-viewer] Bucket "${bucketName}" (${accountName}): failed — ${errorMessage ?? "Unknown error"}`,
+  );
 }
 
 function getCloudProviderLogoUrl(cloudProviderName: string | null) {
