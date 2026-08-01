@@ -20,5 +20,6 @@ else
 fi
 
 echo "Kube context: k3d-${CLUSTER_NAME}"
-echo "Ingress: http://aluminium.127.0.0.1.nip.io"
+echo "S3Viewer:  http://aluminium.127.0.0.1.nip.io"
+echo "MinIO:     minio-backups|logs|archive.minio.svc:9000 (buckets: backups, logs, archive)"
 echo "Run: pnpm deploy"

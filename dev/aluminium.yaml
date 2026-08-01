@@ -13,13 +13,33 @@ spec:
   replicas: 1
   accounts:
     - accountKey: BACKUPS
-      id: s3ScalewayBackup
+      id: minio-backups
       name: Backups
-      endpoint: https://s3.fr-par.scw.cloud
-      region: fr-par
+      endpoint: http://minio-backups.minio.svc.cluster.local:9000
+      region: us-east-1
+      readOnly: false
+      credentialsSecretRef:
+        name: minio-backups-creds
+        accessKeyKey: access-key
+        secretKeyKey: secret-key
+    - accountKey: LOGS
+      id: minio-logs
+      name: Logs
+      endpoint: http://minio-logs.minio.svc.cluster.local:9000
+      region: us-east-1
+      readOnly: false
+      credentialsSecretRef:
+        name: minio-logs-creds
+        accessKeyKey: access-key
+        secretKeyKey: secret-key
+    - accountKey: ARCHIVE
+      id: minio-archive
+      name: Archive
+      endpoint: http://minio-archive.minio.svc.cluster.local:9000
+      region: us-east-1
       readOnly: true
       credentialsSecretRef:
-        name: scaleway-backups-creds
+        name: minio-archive-creds
         accessKeyKey: access-key
         secretKeyKey: secret-key
   service:

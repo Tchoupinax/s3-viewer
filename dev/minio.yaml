@@ -1,0 +1,486 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio
+  labels:
+    app.kubernetes.io/name: minio
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-backups-root
+  namespace: minio
+type: Opaque
+stringData:
+  access-key: minio-backups
+  secret-key: minio-backups-secret
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-logs-root
+  namespace: minio
+type: Opaque
+stringData:
+  access-key: minio-logs
+  secret-key: minio-logs-secret
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-archive-root
+  namespace: minio
+type: Opaque
+stringData:
+  access-key: minio-archive
+  secret-key: minio-archive-secret
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio-backups
+  namespace: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: backups
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+      app.kubernetes.io/instance: backups
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/instance: backups
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-backups-root
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-backups-root
+                  key: secret-key
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-backups
+  namespace: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: backups
+spec:
+  selector:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: backups
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio-logs
+  namespace: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: logs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+      app.kubernetes.io/instance: logs
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/instance: logs
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-logs-root
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-logs-root
+                  key: secret-key
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-logs
+  namespace: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: logs
+spec:
+  selector:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: logs
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio-archive
+  namespace: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: archive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+      app.kubernetes.io/instance: archive
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/instance: archive
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-archive-root
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-archive-root
+                  key: secret-key
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-archive
+  namespace: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: archive
+spec:
+  selector:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: archive
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-media-root
+  namespace: minio
+type: Opaque
+stringData:
+  access-key: minio-media
+  secret-key: minio-media-secret
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio-media
+  namespace: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: media
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+      app.kubernetes.io/instance: media
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/instance: media
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-media-root
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-media-root
+                  key: secret-key
+          ports:
+            - name: api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-media
+  namespace: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: media
+spec:
+  selector:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: media
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-backups-init
+  namespace: minio
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until mc alias set local http://minio-backups:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                echo "waiting for minio-backups..."
+                sleep 2
+              done
+              mc mb --ignore-existing local/backups
+              printf '%s\n' 'sample backup dump 1' > /tmp/backup-001.sql.gz
+              printf '%s\n' 'sample backup dump 2' > /tmp/backup-002.sql.gz
+              printf '%s\n' '{"version":1,"bucket":"backups"}' > /tmp/manifest.json
+              mc cp /tmp/backup-001.sql.gz local/backups/
+              mc cp /tmp/backup-002.sql.gz local/backups/
+              mc cp /tmp/manifest.json local/backups/
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-backups-root
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-backups-root
+                  key: secret-key
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-logs-init
+  namespace: minio
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until mc alias set local http://minio-logs:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                echo "waiting for minio-logs..."
+                sleep 2
+              done
+              mc mb --ignore-existing local/logs
+              printf '%s\n' '2026-08-01 INFO app started' > /tmp/app-2026-08-01.log
+              printf '%s\n' '2026-08-02 INFO request handled' > /tmp/app-2026-08-02.log
+              printf '%s\n' '127.0.0.1 GET /health 200' > /tmp/nginx-access.log
+              mc cp /tmp/app-2026-08-01.log local/logs/
+              mc cp /tmp/app-2026-08-02.log local/logs/
+              mc cp /tmp/nginx-access.log local/logs/
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-logs-root
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-logs-root
+                  key: secret-key
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-archive-init
+  namespace: minio
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until mc alias set local http://minio-archive:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                echo "waiting for minio-archive..."
+                sleep 2
+              done
+              mc mb --ignore-existing local/archive
+              printf '%s\n' 'archived report 2025' > /tmp/report-2025.pdf
+              printf '%s\n' 'archived snapshot data' > /tmp/snapshot.tar
+              printf '%s\n' 'cold storage archive' > /tmp/readme.txt
+              mc cp /tmp/report-2025.pdf local/archive/
+              mc cp /tmp/snapshot.tar local/archive/
+              mc cp /tmp/readme.txt local/archive/
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-archive-root
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-archive-root
+                  key: secret-key
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-media-init
+  namespace: minio
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until mc alias set local http://minio-media:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"; do
+                echo "waiting for minio-media..."
+                sleep 2
+              done
+              mc mb --ignore-existing local/media
+              printf '%s\n' 'fake jpeg bytes' > /tmp/photo-001.jpg
+              printf '%s\n' 'fake video bytes' > /tmp/video-001.mp4
+              printf '%s\n' 'fake png bytes' > /tmp/thumbnail.png
+              mc cp /tmp/photo-001.jpg local/media/
+              mc cp /tmp/video-001.mp4 local/media/
+              mc cp /tmp/thumbnail.png local/media/
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-media-root
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-media-root
+                  key: secret-key

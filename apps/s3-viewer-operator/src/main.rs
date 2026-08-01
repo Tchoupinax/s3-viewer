@@ -15,6 +15,7 @@ use s3_viewer_operator::resources::{
     build_secret, deploy_s3viewer, ingress_url, resource_base_name, service_url,
 };
 use s3_viewer_operator::secrets::build_account_env_data;
+use s3_viewer_operator::spec::resolve_effective_spec;
 use s3_viewer_operator::Error;
 use tokio::time::Duration;
 
@@ -148,14 +149,12 @@ async fn reconcile(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<A
         }
         ViewerAction::Unregister => {
             log_info(&format!("s3viewer deleted: {namespace}/{name}"));
-            if viewer.spec.ingress.is_some() {
-                s3_viewer_operator::resources::delete_ingress_if_present(
-                    &context.client,
-                    &namespace,
-                    &resource_base_name(&viewer),
-                )
-                .await?;
-            }
+            s3_viewer_operator::resources::delete_ingress_if_present(
+                &context.client,
+                &namespace,
+                &resource_base_name(&viewer),
+            )
+            .await?;
             match s3_viewer_operator::finalizer::delete(context.client.clone(), &name, &namespace).await {
                 Ok(_) => {}
                 Err(err) if is_not_found(&err) => {}
@@ -188,21 +187,25 @@ async fn provision_s3viewer(
     namespace: &str,
     viewer: &S3Viewer,
 ) -> Result<(), Error> {
-    if viewer.spec.accounts.is_empty() {
+    let effective = resolve_effective_spec(&context.client, namespace, viewer).await?;
+
+    if effective.accounts.is_empty() {
         return Err(Error::UserInputError(
-            "spec.accounts must contain at least one S3 account".to_owned(),
+            "spec.accounts must contain at least one S3 account (directly or via configRef)"
+                .to_owned(),
         ));
     }
 
-    let secret_data = build_account_env_data(&context.client, namespace, viewer).await?;
+    let secret_data =
+        build_account_env_data(&context.client, namespace, &effective.accounts).await?;
     let secret_name = resource_base_name(viewer);
     let secret = build_secret(viewer, secret_data);
 
     s3_viewer_operator::resources::ensure_secret(&context.client, namespace, &secret).await?;
-    deploy_s3viewer(&context.client, namespace, viewer, &secret_name).await?;
+    deploy_s3viewer(&context.client, namespace, viewer, &effective, &secret_name).await?;
 
-    let mut url = service_url(namespace, viewer);
-    if let Some(ingress_spec) = &viewer.spec.ingress {
+    let mut url = service_url(namespace, viewer, &effective);
+    if let Some(ingress_spec) = &effective.ingress {
         url = ingress_url(ingress_spec);
     }
 
@@ -215,9 +218,8 @@ async fn provision_s3viewer(
         message: Some(format!(
             "deployed {} (service port {}, ingress: {})",
             resource_base_name(viewer),
-            viewer.spec.service.as_ref().map(|s| s.port).unwrap_or(3000),
-            viewer
-                .spec
+            effective.service.as_ref().map(|s| s.port).unwrap_or(3000),
+            effective
                 .ingress
                 .as_ref()
                 .map(|i| i.host.clone())

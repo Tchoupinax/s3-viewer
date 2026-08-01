@@ -2,6 +2,7 @@ pub mod crd;
 pub mod finalizer;
 pub mod resources;
 pub mod secrets;
+pub mod spec;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

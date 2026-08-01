@@ -15,6 +15,7 @@ use kube::api::{Patch, PatchParams, PostParams};
 use kube::{Api, Client, Resource, ResourceExt};
 
 use crate::crd::{IngressSpec as ViewerIngressSpec, S3Viewer, ServiceSpec as ViewerServiceSpec};
+use crate::spec::EffectiveSpec;
 use crate::Error;
 
 const MANAGED_BY: &str = "s3-viewer-operator";
@@ -25,9 +26,8 @@ pub fn resource_base_name(viewer: &S3Viewer) -> String {
     format!("{}-s3-viewer", viewer.name_any())
 }
 
-pub fn default_image(viewer: &S3Viewer) -> String {
-    viewer
-        .spec
+pub fn default_image(effective: &EffectiveSpec) -> String {
+    effective
         .image
         .as_ref()
         .map(|image| image.trim().to_owned())
@@ -41,11 +41,14 @@ pub fn default_image(viewer: &S3Viewer) -> String {
         .unwrap_or_else(|| DEFAULT_IMAGE.to_owned())
 }
 
-fn service_spec(viewer: &S3Viewer) -> ViewerServiceSpec {
-    viewer.spec.service.clone().unwrap_or(crate::crd::ServiceSpec {
-        port: 3000,
-        r#type: "ClusterIP".to_owned(),
-    })
+fn service_spec(effective: &EffectiveSpec) -> ViewerServiceSpec {
+    effective
+        .service
+        .clone()
+        .unwrap_or(crate::crd::ServiceSpec {
+            port: 3000,
+            r#type: "ClusterIP".to_owned(),
+        })
 }
 
 fn labels(viewer: &S3Viewer) -> BTreeMap<String, String> {
@@ -80,8 +83,8 @@ fn object_meta(viewer: &S3Viewer, name: &str) -> ObjectMeta {
     }
 }
 
-fn viewer_annotations(viewer: &S3Viewer) -> BTreeMap<String, String> {
-    let service = service_spec(viewer);
+fn viewer_annotations(viewer: &S3Viewer, effective: &EffectiveSpec) -> BTreeMap<String, String> {
+    let service = service_spec(effective);
     let mut annotations = BTreeMap::new();
     annotations.insert(
         "s3viewer.dev/service-name".to_owned(),
@@ -93,7 +96,7 @@ fn viewer_annotations(viewer: &S3Viewer) -> BTreeMap<String, String> {
     );
     annotations.insert("s3viewer.dev/service-type".to_owned(), service.r#type.clone());
 
-    if let Some(ingress) = &viewer.spec.ingress {
+    if let Some(ingress) = &effective.ingress {
         annotations.insert("s3viewer.dev/ingress-host".to_owned(), ingress.host.clone());
         if let Some(class_name) = ingress.class_name.as_ref().filter(|v| !v.is_empty()) {
             annotations.insert("s3viewer.dev/ingress-class".to_owned(), class_name.clone());
@@ -114,12 +117,12 @@ pub fn build_secret(viewer: &S3Viewer, data: BTreeMap<String, ByteString>) -> Se
     }
 }
 
-pub fn build_deployment(viewer: &S3Viewer, secret_name: &str) -> Deployment {
-    let service = service_spec(viewer);
-    let image = default_image(viewer);
+pub fn build_deployment(viewer: &S3Viewer, effective: &EffectiveSpec, secret_name: &str) -> Deployment {
+    let service = service_spec(effective);
+    let image = default_image(effective);
     let selector_labels = labels(viewer);
     let mut metadata = object_meta(viewer, &resource_base_name(viewer));
-    metadata.annotations = Some(viewer_annotations(viewer));
+    metadata.annotations = Some(viewer_annotations(viewer, effective));
 
     Deployment {
         metadata,
@@ -177,11 +180,11 @@ pub fn build_deployment(viewer: &S3Viewer, secret_name: &str) -> Deployment {
     }
 }
 
-pub fn build_service(viewer: &S3Viewer) -> Service {
-    let service = service_spec(viewer);
+pub fn build_service(viewer: &S3Viewer, effective: &EffectiveSpec) -> Service {
+    let service = service_spec(effective);
     let selector_labels = labels(viewer);
     let mut metadata = object_meta(viewer, &resource_base_name(viewer));
-    metadata.annotations = Some(viewer_annotations(viewer));
+    metadata.annotations = Some(viewer_annotations(viewer, effective));
 
     Service {
         metadata,
@@ -201,8 +204,8 @@ pub fn build_service(viewer: &S3Viewer) -> Service {
     }
 }
 
-pub fn build_ingress(viewer: &S3Viewer, ingress: &ViewerIngressSpec) -> Ingress {
-    let service = service_spec(viewer);
+pub fn build_ingress(viewer: &S3Viewer, effective: &EffectiveSpec, ingress: &ViewerIngressSpec) -> Ingress {
+    let service = service_spec(effective);
     let name = format!("{}-s3-viewer", viewer.name_any());
 
     let mut metadata = object_meta(viewer, &name);
@@ -256,16 +259,17 @@ pub async fn deploy_s3viewer(
     client: &Client,
     namespace: &str,
     viewer: &S3Viewer,
+    effective: &EffectiveSpec,
     secret_name: &str,
 ) -> Result<(), Error> {
-    let deployment = build_deployment(viewer, secret_name);
-    let service = build_service(viewer);
+    let deployment = build_deployment(viewer, effective, secret_name);
+    let service = build_service(viewer, effective);
 
     ensure_deployment(client, namespace, &deployment).await?;
     ensure_service(client, namespace, &service).await?;
 
-    if let Some(ingress_spec) = &viewer.spec.ingress {
-        let ingress = build_ingress(viewer, ingress_spec);
+    if let Some(ingress_spec) = &effective.ingress {
+        let ingress = build_ingress(viewer, effective, ingress_spec);
         ensure_ingress(client, namespace, &ingress).await?;
     } else {
         delete_ingress_if_present(client, namespace, &resource_base_name(viewer)).await?;
@@ -371,8 +375,8 @@ pub async fn deployment_ready(
     Ok(ready >= desired && desired > 0)
 }
 
-pub fn service_url(namespace: &str, viewer: &S3Viewer) -> String {
-    let service = service_spec(viewer);
+pub fn service_url(namespace: &str, viewer: &S3Viewer, effective: &EffectiveSpec) -> String {
+    let service = service_spec(effective);
     format!(
         "http://{}.{}.svc.cluster.local:{}",
         resource_base_name(viewer),

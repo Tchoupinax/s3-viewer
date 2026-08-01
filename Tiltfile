@@ -21,27 +21,50 @@ helm_resource(
   labels=['operator'],
 )
 
-k8s_yaml([
-  'dev/secret.yaml',
-  'dev/aluminium.yaml',
-])
+k8s_yaml('dev/minio.yaml')
 
 k8s_resource(
-  objects=[
-    'aluminium:namespace',
-    'scaleway-backups-creds:secret',
-    'visionn32:s3viewer',
-  ],
-  new_name='aluminium',
-  labels=['app'],
+  'minio-backups',
+  labels=['minio'],
   resource_deps=['s3-viewer-operator'],
 )
 
-k8s_attach(
-  'aluminium-app',
-  'deployment/visionn32-s3-viewer',
-  namespace='aluminium',
-  port_forwards='3000:3000',
+k8s_resource(
+  'minio-logs',
+  labels=['minio'],
+  resource_deps=['s3-viewer-operator'],
+)
+
+k8s_resource(
+  'minio-archive',
+  labels=['minio'],
+  resource_deps=['s3-viewer-operator'],
+)
+
+k8s_resource(
+  'minio-media',
+  labels=['minio'],
+  resource_deps=['s3-viewer-operator'],
+)
+
+k8s_yaml([
+  'dev/secret.yaml',
+  'dev/aluminium.yaml',
+  'dev/copper.yaml',
+])
+
+k8s_resource(
+  objects=['visionn32:s3viewer:aluminium'],
+  new_name='aluminium',
   labels=['app'],
-  resource_deps=['aluminium'],
+  links=['http://aluminium.127.0.0.1.nip.io'],
+  resource_deps=['minio-backups', 'minio-logs', 'minio-archive'],
+)
+
+k8s_resource(
+  objects=['demo:s3viewer:copper', 'default:s3viewerconfig:copper'],
+  new_name='copper',
+  labels=['app'],
+  links=['http://copper.127.0.0.1.nip.io'],
+  resource_deps=['minio-media'],
 )
