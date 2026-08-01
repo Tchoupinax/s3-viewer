@@ -28,15 +28,10 @@ pub struct S3ViewerSpec {
     pub service: Option<ServiceSpec>,
     #[serde(default)]
     pub ingress: Option<IngressSpec>,
-    /// Optional shared defaults from an S3ViewerConfig in the same namespace.
+    /// Namespaces to scan for S3ViewerConfig resources. Each config's accounts become buckets in the UI.
+    /// Defaults to the S3Viewer's own namespace when unset or empty.
     #[serde(default)]
-    pub config_ref: Option<ConfigRef>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ConfigRef {
-    pub name: String,
+    pub config_namespaces: Option<Vec<String>>,
 }
 
 #[derive(CustomResource, Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema)]
@@ -49,20 +44,12 @@ pub struct ConfigRef {
     derive = "PartialEq",
     namespaced,
     status = "S3ViewerConfigStatus",
-    printcolumn = r#"{"name":"Image", "type":"string", "jsonPath":".spec.image"}"#,
     printcolumn = r#"{"name":"Accounts", "type":"integer", "jsonPath":".spec.accounts.length"}"#,
     printcolumn = r#"{"name":"Message", "type":"string", "jsonPath":".status.message"}"#
 )]
 pub struct S3ViewerConfigSpec {
-    /// Default container image for S3Viewer instances referencing this config.
-    #[serde(default)]
-    pub image: Option<String>,
     #[serde(default)]
     pub accounts: Vec<S3AccountSpec>,
-    #[serde(default)]
-    pub service: Option<ServiceSpec>,
-    #[serde(default)]
-    pub ingress: Option<IngressSpec>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, JsonSchema, Default)]

@@ -69,15 +69,12 @@ spec:
                   - region
                   type: object
                 type: array
-              configRef:
-                description: Optional shared defaults from an S3ViewerConfig in the same namespace.
+              configNamespaces:
+                description: Namespaces to scan for S3ViewerConfig resources. Each config's accounts become buckets in the UI. Defaults to the S3Viewer's own namespace when unset or empty.
+                items:
+                  type: string
                 nullable: true
-                properties:
-                  name:
-                    type: string
-                required:
-                - name
-                type: object
+                type: array
               image:
                 description: Container image for the s3-viewer app. Defaults to S3_VIEWER_DEFAULT_IMAGE or ghcr.io/tchoupinax/s3-viewer:latest.
                 nullable: true

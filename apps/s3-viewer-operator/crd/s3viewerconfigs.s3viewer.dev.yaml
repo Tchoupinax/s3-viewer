@@ -13,9 +13,6 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.image
-      name: Image
-      type: string
     - jsonPath: .spec.accounts.length
       name: Accounts
       type: integer
@@ -69,35 +66,6 @@ spec:
                   - region
                   type: object
                 type: array
-              image:
-                description: Default container image for S3Viewer instances referencing this config.
-                nullable: true
-                type: string
-              ingress:
-                nullable: true
-                properties:
-                  className:
-                    nullable: true
-                    type: string
-                  host:
-                    type: string
-                  tlsSecretName:
-                    nullable: true
-                    type: string
-                required:
-                - host
-                type: object
-              service:
-                nullable: true
-                properties:
-                  port:
-                    default: 3000
-                    format: int32
-                    type: integer
-                  type:
-                    default: ClusterIP
-                    type: string
-                type: object
             type: object
           status:
             nullable: true

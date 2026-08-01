@@ -4,22 +4,22 @@ use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::ByteString;
 use kube::Api;
 
-use crate::crd::S3AccountSpec;
+use crate::spec::SourcedAccount;
 use crate::Error;
 
 pub async fn build_account_env_data(
     client: &kube::Client,
-    namespace: &str,
-    accounts: &[S3AccountSpec],
+    accounts: &[SourcedAccount],
 ) -> Result<BTreeMap<String, ByteString>, Error> {
     let mut data = BTreeMap::new();
 
-    for account in accounts {
+    for sourced in accounts {
+        let account = &sourced.account;
         validate_account_key(&account.account_key)?;
 
         let credentials = read_credentials_secret(
             client,
-            namespace,
+            &sourced.credentials_namespace,
             &account.credentials_secret_ref.name,
             &account.credentials_secret_ref.access_key_key,
             &account.credentials_secret_ref.secret_key_key,

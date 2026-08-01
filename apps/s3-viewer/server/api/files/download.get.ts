@@ -3,6 +3,7 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
 import { extractGenerateBucketIdentity } from "~/functions/bucket-identity-number";
 import { getEventQuery } from "~/server/utils/event-query";
+import { getConnections } from "~/server/utils/s3";
 
 export default defineEventHandler(async event => {
   const query = getEventQuery(event);
@@ -17,7 +18,7 @@ export default defineEventHandler(async event => {
     throw new Error("No bucket found");
   }
 
-  const connection = connections.find(
+  const connection = getConnections().find(
     connection => connection.id === accountId,
   );
 

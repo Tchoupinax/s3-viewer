@@ -3,6 +3,7 @@ pub mod finalizer;
 pub mod resources;
 pub mod secrets;
 pub mod spec;
+pub mod viewer_index;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

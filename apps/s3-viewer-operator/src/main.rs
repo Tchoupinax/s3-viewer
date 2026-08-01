@@ -5,17 +5,21 @@ use futures::stream::StreamExt;
 use kube::api::{Patch, PatchParams};
 use kube::runtime::controller::Action;
 use kube::runtime::controller::Error as ControllerError;
+use kube::runtime::reflector::ObjectRef;
 use kube::runtime::watcher::Config as WatchConfig;
 use kube::runtime::watcher::Error as WatchError;
 use kube::runtime::Controller;
 use kube::{Api, Client, Config, Resource, ResourceExt};
 use serde_json::json;
-use s3_viewer_operator::crd::{S3Viewer, S3ViewerStatus};
+use s3_viewer_operator::crd::{S3Viewer, S3ViewerConfig, S3ViewerStatus};
 use s3_viewer_operator::resources::{
     build_secret, deploy_s3viewer, ingress_url, resource_base_name, service_url,
 };
 use s3_viewer_operator::secrets::build_account_env_data;
-use s3_viewer_operator::spec::resolve_effective_spec;
+use s3_viewer_operator::spec::{
+    describe_sourced_accounts, resolve_effective_spec, watched_config_namespaces,
+};
+use s3_viewer_operator::viewer_index::{register_viewer, unregister_viewer, ViewerIndex};
 use s3_viewer_operator::Error;
 use tokio::time::Duration;
 
@@ -34,10 +38,12 @@ async fn main() {
     let kubernetes_client = Client::try_from(kube_config)
         .expect("Failed to create Kubernetes client.");
 
-    let crd_api: Api<S3Viewer> = Api::all(kubernetes_client.clone());
+    let viewer_api: Api<S3Viewer> = Api::all(kubernetes_client.clone());
+    let config_api: Api<S3ViewerConfig> = Api::all(kubernetes_client.clone());
     let context = Arc::new(ContextData {
         client: kubernetes_client,
         cluster_url: cluster_url.clone(),
+        viewer_index: ViewerIndex::new(),
     });
 
     log_info(&format!(
@@ -45,8 +51,19 @@ async fn main() {
     ));
 
     let watch_config = WatchConfig::default().timeout(280);
+    let context_for_watches = context.clone();
 
-    Controller::new(crd_api, watch_config)
+    Controller::new(viewer_api, watch_config.clone())
+        .watches(
+            config_api,
+            watch_config,
+            move |config: S3ViewerConfig| {
+                let config_namespace = config.namespace().unwrap_or_default();
+                context_for_watches
+                    .viewer_index
+                    .viewers_for_namespace(&config_namespace)
+            },
+        )
         .run(reconcile, on_error, context)
         .for_each(|result| {
             let cluster_url = cluster_url.clone();
@@ -126,6 +143,7 @@ fn log_controller_error(
 struct ContextData {
     client: Client,
     cluster_url: String,
+    viewer_index: ViewerIndex,
 }
 
 enum ViewerAction {
@@ -140,15 +158,27 @@ async fn reconcile(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<A
     })?;
     let name = viewer.name_any();
 
+    let viewer = match fetch_viewer(&context.client, &namespace, &name).await {
+        Ok(fresh) => Arc::new(fresh),
+        Err(Error::KubeError { source }) if is_not_found(&source) => viewer,
+        Err(err) => return Err(err),
+    };
+
+    register_viewer(&context.viewer_index, &viewer);
+
     let action = match determine_action(&viewer) {
         ViewerAction::Register => {
-            log_info(&format!("s3viewer created: {namespace}/{name}"));
+            log_info(&format!(
+                "s3viewer created: {namespace}/{name} (generation {})",
+                viewer.meta().generation.unwrap_or(0)
+            ));
             provision_s3viewer(&context, &namespace, &viewer).await?;
             s3_viewer_operator::finalizer::add(context.client.clone(), &name, &namespace).await?;
             Ok(Action::requeue(Duration::from_secs(30)))
         }
         ViewerAction::Unregister => {
             log_info(&format!("s3viewer deleted: {namespace}/{name}"));
+            unregister_viewer(&context.viewer_index, ObjectRef::from(&*viewer));
             s3_viewer_operator::resources::delete_ingress_if_present(
                 &context.client,
                 &namespace,
@@ -163,6 +193,11 @@ async fn reconcile(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<A
             Ok(Action::await_change())
         }
         ViewerAction::NoOp => {
+            log_info(&format!(
+                "s3viewer updated: {namespace}/{name} (generation {}, configNamespaces: {:?})",
+                viewer.meta().generation.unwrap_or(0),
+                viewer.spec.config_namespaces
+            ));
             provision_s3viewer(&context, &namespace, &viewer).await?;
             Ok(Action::requeue(Duration::from_secs(30)))
         }
@@ -182,27 +217,75 @@ async fn reconcile(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<A
     action
 }
 
+async fn fetch_viewer(client: &Client, namespace: &str, name: &str) -> Result<S3Viewer, Error> {
+    let api: Api<S3Viewer> = Api::namespaced(client.clone(), namespace);
+    match api.get(name).await {
+        Ok(viewer) => Ok(viewer),
+        Err(source) => Err(Error::KubeError { source }),
+    }
+}
+
 async fn provision_s3viewer(
     context: &ContextData,
     namespace: &str,
     viewer: &S3Viewer,
 ) -> Result<(), Error> {
+    let config_namespaces = watched_config_namespaces(viewer, namespace);
+    log_info(&format!(
+        "provisioning {}: scanning configNamespaces [{}]",
+        format_reconcile_target(namespace, &viewer.name_any()),
+        config_namespaces.join(",")
+    ));
+
     let effective = resolve_effective_spec(&context.client, namespace, viewer).await?;
+
+    log_info(&format!(
+        "resolved {} account(s) for {}: {}",
+        effective.accounts.len(),
+        format_reconcile_target(namespace, &viewer.name_any()),
+        describe_sourced_accounts(&effective.accounts)
+    ));
+
+    let secret_name = resource_base_name(viewer);
+    let secret_data = if effective.accounts.is_empty() {
+        log_error(&format!(
+            "no S3 accounts for {} in configNamespaces [{}]; clearing secret {}",
+            format_reconcile_target(namespace, &viewer.name_any()),
+            config_namespaces.join(","),
+            secret_name
+        ));
+        std::collections::BTreeMap::new()
+    } else {
+        build_account_env_data(&context.client, &effective.accounts).await?
+    };
+
+    let secret = build_secret(viewer, secret_data.clone());
+    let key_count =
+        s3_viewer_operator::resources::ensure_secret(&context.client, namespace, &secret).await?;
+    log_info(&format!(
+        "secret {}/{} updated ({} env keys, digest accounts: {})",
+        namespace,
+        secret_name,
+        key_count,
+        s3_viewer_operator::spec::accounts_digest(&effective.accounts)
+    ));
 
     if effective.accounts.is_empty() {
         return Err(Error::UserInputError(
-            "spec.accounts must contain at least one S3 account (directly or via configRef)"
+            "no S3 accounts found: add spec.accounts or S3ViewerConfig resources in configNamespaces"
                 .to_owned(),
         ));
     }
 
-    let secret_data =
-        build_account_env_data(&context.client, namespace, &effective.accounts).await?;
-    let secret_name = resource_base_name(viewer);
-    let secret = build_secret(viewer, secret_data);
-
-    s3_viewer_operator::resources::ensure_secret(&context.client, namespace, &secret).await?;
-    deploy_s3viewer(&context.client, namespace, viewer, &effective, &secret_name).await?;
+    deploy_s3viewer(
+        &context.client,
+        namespace,
+        viewer,
+        &effective,
+        &secret_name,
+        &secret_data,
+    )
+    .await?;
 
     let mut url = service_url(namespace, viewer, &effective);
     if let Some(ingress_spec) = &effective.ingress {
@@ -216,9 +299,10 @@ async fn provision_s3viewer(
         ready,
         last_sync_time: Some(Utc::now().to_rfc3339()),
         message: Some(format!(
-            "deployed {} (service port {}, ingress: {})",
+            "deployed {} (configNamespaces: {}, accounts: {}, ingress: {})",
             resource_base_name(viewer),
-            effective.service.as_ref().map(|s| s.port).unwrap_or(3000),
+            config_namespaces.join(","),
+            effective.accounts.len(),
             effective
                 .ingress
                 .as_ref()

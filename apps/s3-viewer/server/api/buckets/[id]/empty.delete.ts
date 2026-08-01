@@ -1,7 +1,7 @@
 import type { BucketIdentityNumber } from "~/functions/bucket-identity-number";
 import { extractGenerateBucketIdentity } from "~/functions/bucket-identity-number";
 import type { S3ViewerResponse } from "~/server/types/response";
-import { connections } from "~/server/utils/s3";
+import { getConnections } from "~/server/utils/s3";
 import { executeBucketEmpty } from "~/server/utils/s3-objects";
 import {
   assertWriteAccess,
@@ -20,7 +20,7 @@ export default defineEventHandler(
     const { bucketName, accountId } =
       extractGenerateBucketIdentity(bucketIdentityNumber);
 
-    const connection = connections.find(c => c.id === accountId);
+    const connection = getConnections().find(c => c.id === accountId);
 
     if (!connection || !bucketName) {
       throw createError({

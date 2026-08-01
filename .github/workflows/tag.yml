@@ -56,3 +56,48 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+
+  helm:
+    name: Publish Helm chart 📦
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set chart version from tag
+      id: version
+      run: |
+        VERSION="${GITHUB_REF_NAME#v}"
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+        sed -i "s/^version: .*/version: ${VERSION}/" charts/s3-viewer/Chart.yaml
+        sed -i "s/^appVersion: .*/appVersion: \"${VERSION}\"/" charts/s3-viewer/Chart.yaml
+        sed -i "s/^    tag: .*/    tag: ${VERSION}/" charts/s3-viewer/values.yaml
+        sed -i "s|^  defaultAppImage: .*|  defaultAppImage: ghcr.io/tchoupinax/s3-viewer:${VERSION}|" charts/s3-viewer/values.yaml
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+
+    - name: Lint chart
+      run: helm lint charts/s3-viewer
+
+    - name: Package chart
+      run: helm package charts/s3-viewer
+
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+
+    - name: Push chart to OCI registry
+      run: helm push s3-viewer-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/tchoupinax/helm
+
+    - name: Make chart package public
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh api \
+          --method PATCH \
+          -H "Accept: application/vnd.github+json" \
+          "/users/tchoupinax/packages/container/helm%2Fs3-viewer" \
+          --input - <<< '{"visibility":"public"}'

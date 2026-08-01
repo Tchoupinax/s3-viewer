@@ -11,7 +11,7 @@ import { generateBucketIdentityNumber } from "../../functions/bucket-identity-nu
 import type { S3ViewerResponse } from "../types/response";
 import { defaultS3ViewerBucketToBucket, type S3ViewerBucket } from "~/server/types/bucket";
 import { groupByFn } from "~/server/utils/functions";
-import { connections } from "~/server/utils/s3";
+import { getConnections } from "~/server/utils/s3";
 
 export default defineEventHandler(
   async (): Promise<
@@ -21,7 +21,7 @@ export default defineEventHandler(
     }>
   > => {
     const commmands = await Promise.all(
-      connections.map(({ connection, organizationOrAccountName, id }) =>
+      getConnections().map(({ connection, organizationOrAccountName, id }) =>
         withTimeout(
           (async () => {
             let errorMessage: string | null = null;

@@ -11,7 +11,7 @@ import type { S3ViewerDocument } from "~/server/types/document";
 import type { FileNode } from "~/server/types/file-node";
 import { buildFileTree } from "~/server/types/file-node";
 import { getEventQuery } from "~/server/utils/event-query";
-import { connections } from "~/server/utils/s3";
+import { getConnections } from "~/server/utils/s3";
 
 export default defineEventHandler(
   async (
@@ -37,7 +37,7 @@ export default defineEventHandler(
     const { bucketName, accountId } =
       extractGenerateBucketIdentity(bucketIdentityNumber);
 
-    const connection = connections.find(
+    const connection = getConnections().find(
       connection => connection.id === accountId,
     );
 

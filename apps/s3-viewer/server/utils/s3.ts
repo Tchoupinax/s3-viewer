@@ -1,6 +1,14 @@
 import { S3Client } from "@aws-sdk/client-s3";
+import { existsSync, watch } from "node:fs";
+import { clearTimeout, setInterval, setTimeout } from "node:timers";
 
 import type { Account } from "~/server/types/account";
+import {
+  ACCOUNT_ENV_PREFIX,
+  fingerprintAccountEnv,
+  loadS3ViewerAccountEnv,
+  S3_VIEWER_ACCOUNTS_DIR,
+} from "~/server/utils/s3-env";
 
 const REQUIRED_FIELDS = [
   "ACCESS_KEY",
@@ -9,6 +17,16 @@ const REQUIRED_FIELDS = [
   "NAME",
   "REGION",
   "SECRET_KEY",
+] as const;
+
+const ACCOUNT_FIELD_SUFFIXES = [
+  "ACCESS_KEY",
+  "SECRET_KEY",
+  "ENDPOINT",
+  "ID",
+  "NAME",
+  "REGION",
+  "READ_ONLY",
 ] as const;
 
 type RawAccount = {
@@ -21,56 +39,140 @@ type RawAccount = {
   READ_ONLY?: string;
 };
 
+let currentConnections: Array<Account> = [];
+let currentFingerprint = "";
+let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+
 function parseReadOnly(value: string | undefined): boolean {
-  if (!value) {return false;}
+  if (!value) {
+    return false;
+  }
+
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
-export function loadS3AccountsFromEnv(): Array<Account> {
-  const rawAccounts: Record<string, RawAccount> = {};
+function parseRawAccounts(env: Record<string, string>): Record<string, RawAccount> {
+  const rawAccounts: Record<string, Partial<RawAccount>> = {};
 
-  for (const [key, value] of Object.entries(process.env)) {
-    if (!key.startsWith("S3_VIEWER_ACCOUNT_") || !value) {continue;}
-
-    // S3_<ACCOUNT>_<FIELD>
-    const match = key.match(/^S3_VIEWER_ACCOUNT_([^_]+)_(.+)$/);
-    if (!match) {
+  for (const [key, value] of Object.entries(env)) {
+    if (!key.startsWith(ACCOUNT_ENV_PREFIX) || !value) {
       continue;
     }
 
-    const [, accountName, field] = match;
+    const rest = key.slice(ACCOUNT_ENV_PREFIX.length);
 
-    rawAccounts[accountName] ??= {};
-    rawAccounts[accountName][field as keyof RawAccount] = value;
+    for (const field of ACCOUNT_FIELD_SUFFIXES) {
+      const suffix = `_${field}`;
+
+      if (!rest.endsWith(suffix)) {
+        continue;
+      }
+
+      const accountKey = rest.slice(0, -suffix.length);
+
+      if (!accountKey) {
+        continue;
+      }
+
+      rawAccounts[accountKey] ??= {};
+      rawAccounts[accountKey][field as keyof RawAccount] = value;
+      break;
+    }
   }
 
-  return Object.entries(rawAccounts).map(([accountKey, raw]) => {
+  const parsed: Record<string, RawAccount> = {};
+
+  for (const [accountKey, raw] of Object.entries(rawAccounts)) {
     for (const field of REQUIRED_FIELDS) {
       if (!raw[field]) {
         throw new Error(
-          `Missing env var: S3_VIEWER_ACCOUNT_${accountKey}_${field}`,
+          `Missing env var: ${ACCOUNT_ENV_PREFIX}${accountKey}_${field}`,
         );
       }
     }
 
-    return {
-      id: raw.ID,
-      organizationOrAccountName: raw.NAME,
-      readOnly: parseReadOnly(raw.READ_ONLY),
-      connection: new S3Client({
-        endpoint: raw.ENDPOINT,
-        region: raw.REGION,
-        forcePathStyle: true,
-        credentials: {
-          accessKeyId: raw.ACCESS_KEY,
-          secretAccessKey: raw.SECRET_KEY,
-        },
-      }),
-      mappedBuckets: null,
-    };
-  });
+    parsed[accountKey] = raw as RawAccount;
+  }
+
+  return parsed;
 }
 
-loadS3AccountsFromEnv();
+function buildAccountsFromEnv(env: Record<string, string>): Array<Account> {
+  const rawAccounts = parseRawAccounts(env);
 
-export const connections = loadS3AccountsFromEnv();
+  return Object.values(rawAccounts).map(raw => ({
+    id: raw.ID,
+    organizationOrAccountName: raw.NAME,
+    readOnly: parseReadOnly(raw.READ_ONLY),
+    connection: new S3Client({
+      endpoint: raw.ENDPOINT,
+      region: raw.REGION,
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId: raw.ACCESS_KEY,
+        secretAccessKey: raw.SECRET_KEY,
+      },
+    }),
+    mappedBuckets: null,
+  }));
+}
+
+function reloadConnections(): void {
+  const env = loadS3ViewerAccountEnv();
+  const fingerprint = fingerprintAccountEnv(env);
+
+  if (fingerprint === currentFingerprint) {
+    return;
+  }
+
+  const nextConnections = buildAccountsFromEnv(env);
+  currentFingerprint = fingerprint;
+  currentConnections = nextConnections;
+
+  console.log(
+    `[s3-viewer] loaded ${nextConnections.length} S3 account(s) from ${
+      existsSync(S3_VIEWER_ACCOUNTS_DIR)
+        ? S3_VIEWER_ACCOUNTS_DIR
+        : "process.env"
+    }`,
+  );
+}
+
+function scheduleReload(): void {
+  if (reloadTimer) {
+    clearTimeout(reloadTimer);
+  }
+
+  reloadTimer = setTimeout(() => {
+    reloadTimer = null;
+
+    try {
+      reloadConnections();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[s3-viewer] failed to reload S3 accounts: ${message}`);
+    }
+  }, 250);
+}
+
+export function getConnections(): Array<Account> {
+  return currentConnections;
+}
+
+export function initS3AccountHotReload(): void {
+  reloadConnections();
+
+  if (!existsSync(S3_VIEWER_ACCOUNTS_DIR)) {
+    console.log(
+      "[s3-viewer] account hot reload disabled (set S3_VIEWER_ACCOUNTS_DIR or mount secret volume)",
+    );
+    return;
+  }
+
+  watch(S3_VIEWER_ACCOUNTS_DIR, { persistent: true }, () => scheduleReload());
+  setInterval(() => scheduleReload(), 5_000);
+
+  console.log(
+    `[s3-viewer] account hot reload enabled for ${S3_VIEWER_ACCOUNTS_DIR}`,
+  );
+}

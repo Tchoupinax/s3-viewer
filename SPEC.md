@@ -1,0 +1,4 @@
+- S3Viewer ingest every S3ViewerConfig it can read and use those config as bucket in the UI.
+- By default, it read only in the same namespace.
+- It can read any namespace as long as it has permissions (user must provide SA/role/rolebinding).
+- Namespace can be specified as a list on S3Viewer CRD description.

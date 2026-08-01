@@ -6,7 +6,7 @@ import {
   writeAccessDeniedError,
   writeHandlerError,
 } from "~/server/utils/progress-stream";
-import { connections } from "~/server/utils/s3";
+import { getConnections } from "~/server/utils/s3";
 import { executeBucketEmpty } from "~/server/utils/s3-objects";
 import {
   assertWriteAccess,
@@ -24,7 +24,7 @@ export default defineEventHandler(async event => {
   const { bucketName, accountId } =
     extractGenerateBucketIdentity(bucketIdentityNumber);
 
-  const connection = connections.find(c => c.id === accountId);
+  const connection = getConnections().find(c => c.id === accountId);
 
   if (!connection || !bucketName) {
     throw createError({

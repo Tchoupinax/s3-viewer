@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Container, ContainerPort, EnvFromSource, EnvVar, PodSpec, PodTemplateSpec, Secret,
-    SecretEnvSource, Service, ServicePort, ServiceSpec,
+    Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec, Secret, SecretVolumeSource,
+    Service, ServicePort, ServiceSpec, Volume, VolumeMount,
 };
 use k8s_openapi::api::networking::v1::{
     HTTPIngressPath, HTTPIngressRuleValue, Ingress, IngressBackend, IngressRule,
@@ -21,6 +21,8 @@ use crate::Error;
 const MANAGED_BY: &str = "s3-viewer-operator";
 const APP_NAME: &str = "s3-viewer";
 const DEFAULT_IMAGE: &str = "ghcr.io/tchoupinax/s3-viewer:latest";
+const ACCOUNTS_VOLUME_NAME: &str = "account-config";
+const ACCOUNTS_MOUNT_PATH: &str = "/etc/s3-viewer/accounts";
 
 pub fn resource_base_name(viewer: &S3Viewer) -> String {
     format!("{}-s3-viewer", viewer.name_any())
@@ -106,18 +108,55 @@ fn viewer_annotations(viewer: &S3Viewer, effective: &EffectiveSpec) -> BTreeMap<
         }
     }
 
+    annotations.insert(
+        "s3viewer.dev/accounts-digest".to_owned(),
+        crate::spec::accounts_digest(&effective.accounts),
+    );
+
     annotations
+}
+
+fn pod_template_annotations(
+    effective: &EffectiveSpec,
+    secret_data: &BTreeMap<String, ByteString>,
+) -> BTreeMap<String, String> {
+    let mut annotations = BTreeMap::new();
+    annotations.insert(
+        "s3viewer.dev/accounts-digest".to_owned(),
+        crate::spec::accounts_digest(&effective.accounts),
+    );
+    annotations.insert(
+        "s3viewer.dev/secret-digest".to_owned(),
+        secret_data_digest(secret_data),
+    );
+    annotations
+}
+
+fn secret_data_digest(data: &BTreeMap<String, ByteString>) -> String {
+    let mut parts = data
+        .iter()
+        .map(|(key, value)| format!("{}={}", key, String::from_utf8_lossy(&value.0)))
+        .collect::<Vec<_>>();
+    parts.sort();
+    parts.join("|")
 }
 
 pub fn build_secret(viewer: &S3Viewer, data: BTreeMap<String, ByteString>) -> Secret {
     Secret {
         metadata: object_meta(viewer, &resource_base_name(viewer)),
+        type_: Some("Opaque".to_owned()),
         data: Some(data),
+        string_data: None,
         ..Default::default()
     }
 }
 
-pub fn build_deployment(viewer: &S3Viewer, effective: &EffectiveSpec, secret_name: &str) -> Deployment {
+pub fn build_deployment(
+    viewer: &S3Viewer,
+    effective: &EffectiveSpec,
+    secret_name: &str,
+    secret_data: &BTreeMap<String, ByteString>,
+) -> Deployment {
     let service = service_spec(effective);
     let image = default_image(effective);
     let selector_labels = labels(viewer);
@@ -135,6 +174,7 @@ pub fn build_deployment(viewer: &S3Viewer, effective: &EffectiveSpec, secret_nam
             template: PodTemplateSpec {
                 metadata: Some(ObjectMeta {
                     labels: Some(selector_labels),
+                    annotations: Some(pod_template_annotations(effective, secret_data)),
                     ..Default::default()
                 }),
                 spec: Some(PodSpec {
@@ -161,16 +201,29 @@ pub fn build_deployment(viewer: &S3Viewer, effective: &EffectiveSpec, secret_nam
                                 value: Some("production".to_owned()),
                                 ..Default::default()
                             },
+                            EnvVar {
+                                name: "S3_VIEWER_ACCOUNTS_DIR".to_owned(),
+                                value: Some(ACCOUNTS_MOUNT_PATH.to_owned()),
+                                ..Default::default()
+                            },
                         ]),
-                        env_from: Some(vec![EnvFromSource {
-                            secret_ref: Some(SecretEnvSource {
-                                name: secret_name.to_owned(),
-                                optional: None,
-                            }),
+                        volume_mounts: Some(vec![VolumeMount {
+                            name: ACCOUNTS_VOLUME_NAME.to_owned(),
+                            mount_path: ACCOUNTS_MOUNT_PATH.to_owned(),
+                            read_only: Some(true),
                             ..Default::default()
                         }]),
                         ..Default::default()
                     }],
+                    volumes: Some(vec![Volume {
+                        name: ACCOUNTS_VOLUME_NAME.to_owned(),
+                        secret: Some(SecretVolumeSource {
+                            secret_name: Some(secret_name.to_owned()),
+                            optional: None,
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    }]),
                     ..Default::default()
                 }),
             },
@@ -261,8 +314,9 @@ pub async fn deploy_s3viewer(
     viewer: &S3Viewer,
     effective: &EffectiveSpec,
     secret_name: &str,
+    secret_data: &BTreeMap<String, ByteString>,
 ) -> Result<(), Error> {
-    let deployment = build_deployment(viewer, effective, secret_name);
+    let deployment = build_deployment(viewer, effective, secret_name, secret_data);
     let service = build_service(viewer, effective);
 
     ensure_deployment(client, namespace, &deployment).await?;
@@ -301,14 +355,27 @@ where
     Ok(())
 }
 
-pub async fn ensure_secret(client: &Client, namespace: &str, secret: &Secret) -> Result<(), Error> {
+pub async fn ensure_secret(client: &Client, namespace: &str, secret: &Secret) -> Result<usize, Error> {
     let name = secret
         .metadata
         .name
         .clone()
         .ok_or_else(|| Error::UserInputError("secret name is required".to_owned()))?;
+    let key_count = secret.data.as_ref().map(|data| data.len()).unwrap_or(0);
     let api: Api<Secret> = Api::namespaced(client.clone(), namespace);
-    apply_resource(&api, &name, secret).await
+    let patch_params = PatchParams::apply("s3-viewer-operator").force();
+    match api.get(&name).await {
+        Ok(_) => {
+            api.patch(&name, &patch_params, &Patch::Apply(secret))
+                .await?;
+        }
+        Err(kube::Error::Api(response)) if response.code == 404 => {
+            api.create(&PostParams::default(), secret).await?;
+        }
+        Err(source) => return Err(Error::KubeError { source }),
+    }
+
+    Ok(key_count)
 }
 
 pub async fn ensure_deployment(
