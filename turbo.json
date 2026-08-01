@@ -1,0 +1,37 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "globalPassThroughEnv": [
+    "KUBECONFIG",
+    "S3_VIEWER_DEFAULT_IMAGE"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".output/**", "target/release/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "cache": false
+    },
+    "lint:eslint": {
+      "cache": false
+    },
+    "lint:vue:check": {
+      "cache": false
+    },
+    "check": {
+      "cache": false
+    },
+    "test": {
+      "cache": false
+    }
+  }
+}

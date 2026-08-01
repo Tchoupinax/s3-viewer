@@ -1,0 +1,51 @@
+{{- if and .Values.operator.enabled .Values.operator.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "s3-viewer.operator.name" . }}
+  labels:
+    {{- include "s3-viewer.operator.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["s3viewer.dev"]
+    resources: ["s3viewers"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["s3viewer.dev"]
+    resources: ["s3viewers/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["s3viewer.dev"]
+    resources: ["s3viewers/finalizers"]
+    verbs: ["update"]
+  - apiGroups: ["s3viewer.dev"]
+    resources: ["s3viewerconfigs"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["s3viewer.dev"]
+    resources: ["s3viewerconfigs/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["s3viewer.dev"]
+    resources: ["s3viewerconfigs/finalizers"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["secrets", "services", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "s3-viewer.operator.name" . }}
+  labels:
+    {{- include "s3-viewer.operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "s3-viewer.operator.name" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "s3-viewer.operator.serviceAccountName" . }}
+    namespace: {{ .Values.operator.namespace }}
+{{- end }}

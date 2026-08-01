@@ -1,7 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+
 allowBuilds:
   '@parcel/watcher': false
   esbuild: false
   unrs-resolver: false
+
+ignoredBuiltDependencies:
+  - esbuild
 
 minimumReleaseAgeExclude:
   - '@aws-sdk/checksums@3.1000.3'

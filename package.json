@@ -1,38 +1,21 @@
 {
   "name": "s3-viewer",
-  "type": "module",
   "private": true,
   "scripts": {
-    "build": "nuxt build",
-    "generate": "nuxt generate",
-    "lint": "pnpm lint:eslint && pnpm lint:vue:check",
-    "lint:eslint": "nuxt prepare && eslint . --fix",
-    "lint:vue:check": "vue-tsc --noEmit",
-    "preview": "nuxt preview",
-    "upgrade": "npm-check-updates -i -c 1",
-    "watch": "nuxt dev"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "3.1097.0",
-    "@nuxt/a11y": "1.0.0-alpha.1",
-    "@nuxtjs/tailwindcss": "6.14.0",
-    "nuxt": "4.5.1",
-    "pretty-bytes": "7.1.1",
-    "shikiji": "0.10.2",
-    "timeago.js": "4.0.2",
-    "ts-pattern": "5.9.0",
-    "vue": "3.5.40",
-    "vue-router": "5.2.0"
+    "build": "turbo run build",
+    "crd:generate": "bash scripts/generate-crd.sh",
+    "watch": "pnpm --filter @s3-viewer/app watch",
+    "lint": "turbo run lint",
+    "operator": "pnpm --filter s3-viewer-operator watch",
+    "up": "pnpm cluster:up && pnpm deploy",
+    "down": "pnpm cluster:down",
+    "cluster:up": "bash scripts/cluster-up.sh",
+    "cluster:down": "bash scripts/cluster-down.sh",
+    "deploy": "tilt up",
+    "deploy:down": "tilt down"
   },
   "devDependencies": {
-    "@nuxt/eslint": "1.16.0",
-    "@nuxt/hints": "1.1.4",
-    "@types/node": "26.1.2",
-    "eslint": "10.8.0",
-    "eslint-config-tchoupinax": "2.6.1",
-    "npm-check-updates": "23.0.0",
-    "typescript": "7.0.2",
-    "vite-plugin-eslint2": "5.3.0"
+    "turbo": "2.10.8"
   },
   "packageManager": "pnpm@11.18.0"
 }

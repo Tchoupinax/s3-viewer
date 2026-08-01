@@ -1,0 +1,9 @@
+**/.git
+**/.turbo
+**/.nuxt
+**/.output
+**/node_modules
+apps/s3-viewer
+.github
+.env
+.env.*

@@ -1,4 +1,4 @@
 **
 
-!.output
-!.output/**
+!apps/s3-viewer/.output
+!apps/s3-viewer/.output/**

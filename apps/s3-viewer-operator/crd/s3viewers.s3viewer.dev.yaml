@@ -1,0 +1,139 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: s3viewers.s3viewer.dev
+spec:
+  group: s3viewer.dev
+  names:
+    categories: []
+    kind: S3Viewer
+    plural: s3viewers
+    shortNames: []
+    singular: s3viewer
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.ready
+      name: Ready
+      type: boolean
+    - jsonPath: .spec.image
+      name: Image
+      type: string
+    - jsonPath: .status.message
+      name: Message
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for S3ViewerSpec via `CustomResource`
+        properties:
+          spec:
+            properties:
+              accounts:
+                default: []
+                items:
+                  properties:
+                    accountKey:
+                      description: Env prefix key (e.g. BACKUPS -> S3_VIEWER_ACCOUNT_BACKUPS_*).
+                      type: string
+                    credentialsSecretRef:
+                      properties:
+                        accessKeyKey:
+                          type: string
+                        name:
+                          type: string
+                        secretKeyKey:
+                          type: string
+                      required:
+                      - accessKeyKey
+                      - name
+                      - secretKeyKey
+                      type: object
+                    endpoint:
+                      type: string
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    readOnly:
+                      default: false
+                      type: boolean
+                    region:
+                      type: string
+                  required:
+                  - accountKey
+                  - credentialsSecretRef
+                  - endpoint
+                  - id
+                  - name
+                  - region
+                  type: object
+                type: array
+              configRef:
+                description: Optional shared defaults from an S3ViewerConfig in the same namespace.
+                nullable: true
+                properties:
+                  name:
+                    type: string
+                required:
+                - name
+                type: object
+              image:
+                description: Container image for the s3-viewer app. Defaults to S3_VIEWER_DEFAULT_IMAGE or ghcr.io/tchoupinax/s3-viewer:latest.
+                nullable: true
+                type: string
+              ingress:
+                nullable: true
+                properties:
+                  className:
+                    nullable: true
+                    type: string
+                  host:
+                    type: string
+                  tlsSecretName:
+                    nullable: true
+                    type: string
+                required:
+                - host
+                type: object
+              replicas:
+                default: 1
+                format: int32
+                type: integer
+              service:
+                nullable: true
+                properties:
+                  port:
+                    default: 3000
+                    format: int32
+                    type: integer
+                  type:
+                    default: ClusterIP
+                    type: string
+                type: object
+            type: object
+          status:
+            nullable: true
+            properties:
+              lastSyncTime:
+                nullable: true
+                type: string
+              message:
+                nullable: true
+                type: string
+              ready:
+                type: boolean
+              url:
+                nullable: true
+                type: string
+            required:
+            - ready
+            type: object
+        required:
+        - spec
+        title: S3Viewer
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

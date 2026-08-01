@@ -1,0 +1,43 @@
+{{- if and .Values.s3viewer.enabled .Values.s3viewer.instances }}
+{{- range .Values.s3viewer.instances }}
+{{- $credentials := get . "credentials" }}
+{{- if and $credentials $credentials.create }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ required "credentials.secretName is required when credentials.create is true" $credentials.secretName }}
+  namespace: {{ .namespace | default "default" }}
+  labels:
+    {{- include "s3-viewer.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: s3viewer
+type: Opaque
+stringData:
+  {{- range $key, $value := $credentials.data }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: s3viewer.dev/v1
+kind: S3Viewer
+metadata:
+  name: {{ required "instance name is required" .name }}
+  namespace: {{ .namespace | default "default" }}
+  labels:
+    {{- include "s3-viewer.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: s3viewer
+spec:
+  image: {{ (.image | default $.Values.operator.defaultAppImage) | quote }}
+  replicas: {{ .replicas | default 1 }}
+  accounts:
+    {{- toYaml .accounts | nindent 4 }}
+  {{- with .service }}
+  service:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .ingress }}
+  ingress:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

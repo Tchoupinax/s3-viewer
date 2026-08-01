@@ -1,0 +1,30 @@
+operator:
+  enabled: true
+  namespace: s3-viewer-operator
+  createNamespace: true
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/tchoupinax/s3-viewer-operator
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+  serviceAccount:
+    create: true
+    name: s3-viewer-operator
+
+  rbac:
+    create: true
+
+  defaultAppImage: ghcr.io/tchoupinax/s3-viewer:latest
+
+s3viewer:
+  enabled: false
+  instances: []
