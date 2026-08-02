@@ -55,8 +55,8 @@ importers:
         specifier: 2.6.1
         version: 2.6.1(@typescript-eslint/utils@8.65.0(eslint@10.8.0(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2))(eslint-import-resolver-node@0.3.10(supports-color@10.2.2))(jiti@2.7.0)(supports-color@10.2.2)(typescript@7.0.2)
       npm-check-updates:
-        specifier: 22.2.9
-        version: 22.2.9
+        specifier: 23.0.0
+        version: 23.0.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -3907,9 +3907,9 @@ packages:
   nostics@1.2.0:
     resolution: {integrity: sha512-FGqEfhQjrvo1lL8KFifdTQiNwwQHJxC1jtYE1Rc54qF/jxONUNL+kC9gS1krX8Q65PgrQ5fCqH/I4NhWBvdSqg==}
 
-  npm-check-updates@22.2.9:
-    resolution: {integrity: sha512-DVeZ0KirHfliSsHuR2o7cHE+tW439sVHfJjF6cGWeDiY0Wyl3BI/jS4zV0eixtcMOquFbcF1Su/FsxOvk5MoYA==}
-    engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0, npm: '>=10.0.0'}
+  npm-check-updates@23.0.0:
+    resolution: {integrity: sha512-B7dvnnS4Tm/4YQghXjBgGBDuHsk88hqCmr4ZuCr0nscsPzf/QVMls5mT8ZUcHrcrFRBP1afB2KNuJo8Px55DrA==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0, npm: '>=10.0.0'}
     hasBin: true
 
   npm-run-path@5.3.0:
@@ -9989,7 +9989,7 @@ snapshots:
 
   nostics@1.2.0: {}
 
-  npm-check-updates@22.2.9: {}
+  npm-check-updates@23.0.0: {}
 
   npm-run-path@5.3.0:
     dependencies:
