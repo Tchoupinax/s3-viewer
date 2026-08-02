@@ -191,7 +191,7 @@ jobs:
       run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
 
     - name: Push chart to OCI registry
-      run: helm push s3-viewer-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/tchoupinax/helm
+      run: helm push s3-viewer-operator-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/tchoupinax/helm
 
   labels:
     name: Autodetect labels 🔍
