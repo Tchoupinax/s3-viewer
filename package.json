@@ -13,7 +13,8 @@
     "cluster:down": "bash scripts/cluster-down.sh",
     "deploy": "tilt up",
     "deploy:down": "tilt down",
-    "check": "gitleaks dir -v && gitleaks git -v"
+    "check": "gitleaks dir -v && gitleaks git -v",
+    "isReady": "pnpm build && pnpm lint && pnpm crd:generate && pnpm check"
   },
   "devDependencies": {
     "turbo": "2.10.8"

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 export const S3_VIEWER_ACCOUNTS_DIR =
