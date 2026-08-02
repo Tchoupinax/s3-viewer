@@ -30,6 +30,8 @@ jobs:
     steps:
     - name: Check operator build success 🦫
       uses: tchoupinax/repo-config/shared-actions/steps/rust/build@master
+      with:
+        workingDirectory: apps/s3-viewer-operator
   #build-application-docker:
   #  name: Build container for application 🐳
   #  runs-on: ubuntu-24.04
