@@ -1,0 +1,7 @@
+apiVersion: v2
+name: s3-viewer-operator
+description: Deploy the s3-viewer operator, CRDs, and optional S3Viewer instances.
+type: application
+version: 0.1.0
+appVersion: "0.16.0"
+kubeVersion: ">=1.25.0-0"

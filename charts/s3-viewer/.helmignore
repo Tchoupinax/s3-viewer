@@ -1,0 +1,5 @@
+# Patterns for helm package
+
+.git/
+.turbo/
+node_modules/

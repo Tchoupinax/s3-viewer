@@ -1,0 +1,35 @@
+{{- if .Values.operator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "s3-viewer.operator.name" . }}
+  namespace: {{ .Values.operator.namespace }}
+  labels:
+    {{- include "s3-viewer.operator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.operator.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "s3-viewer.operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "s3-viewer.operator.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "s3-viewer.operator.serviceAccountName" . }}
+      containers:
+        - name: operator
+          image: {{ include "s3-viewer.operator.image" . }}
+          imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+          {{- if .Values.operator.serviceMonitor.enabled }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.operator.metrics.port }}
+              protocol: TCP
+          {{- end }}
+          env:
+            - name: S3_VIEWER_DEFAULT_IMAGE
+              value: {{ .Values.operator.defaultAppImage | quote }}
+          resources:
+            {{- toYaml .Values.operator.resources | nindent 12 }}
+{{- end }}

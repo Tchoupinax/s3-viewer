@@ -1,0 +1,32 @@
+apiVersion: s3viewer.dev/v1
+kind: S3ViewerConfig
+metadata:
+  name: media
+  namespace: copper
+
+spec:
+  accounts:
+    - accountKey: COPPER
+      id: minio-media
+      name: Copper
+      endpoint: http://minio-media.minio.svc.cluster.local:9000
+      region: us-east-1
+      readOnly: false
+      credentialsSecretRef:
+        name: minio-media-creds
+        accessKeyKey: access-key
+        secretKeyKey: secret-key
+
+---
+apiVersion: s3viewer.dev/v1
+kind: S3Viewer
+metadata:
+  name: demo
+  namespace: copper
+spec:
+  replicas: 1
+  service:
+    port: 3000
+    type: ClusterIP
+  ingress:
+    host: copper.127.0.0.1.nip.io

@@ -1,0 +1,12 @@
+{
+  "name": "@s3-viewer/operator",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --release",
+    "lint": "cargo clippy --all-targets -- -D warnings",
+    "watch": "cargo run",
+    "check": "cargo check",
+    "test": "cargo test",
+    "crd:generate": "bash ../../scripts/generate-crd.sh"
+  }
+}

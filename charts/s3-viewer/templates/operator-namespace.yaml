@@ -1,0 +1,8 @@
+{{- if and .Values.operator.enabled .Values.operator.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.operator.namespace }}
+  labels:
+    {{- include "s3-viewer.operator.labels" . | nindent 4 }}
+{{- end }}

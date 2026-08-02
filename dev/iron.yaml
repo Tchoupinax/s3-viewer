@@ -1,0 +1,39 @@
+# Local archive bucket (credentials live in this namespace).
+apiVersion: s3viewer.dev/v1
+kind: S3ViewerConfig
+metadata:
+  name: archive
+  namespace: iron
+
+spec:
+  accounts:
+    - accountKey: IRON
+      id: minio-archive
+      name: Iron
+      endpoint: http://minio-archive.minio.svc.cluster.local:9000
+      region: us-east-1
+      readOnly: true
+      credentialsSecretRef:
+        name: minio-archive-creds
+        accessKeyKey: access-key
+        secretKeyKey: secret-key
+
+---
+# Ingests S3ViewerConfigs from iron and copper (cross-namespace).
+apiVersion: s3viewer.dev/v1
+kind: S3Viewer
+metadata:
+  name: main
+  namespace: iron
+
+spec:
+  replicas: 1
+  configNamespaces:
+    - iron
+    - aluminium
+    - copper
+  service:
+    port: 3000
+    type: ClusterIP
+  ingress:
+    host: iron.127.0.0.1.nip.io

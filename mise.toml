@@ -1,2 +1,7 @@
 [tools]
 node = "26"
+rust = "1.95"
+k3d = "latest"
+tilt = "latest"
+helm = "latest"
+kubectl = "latest"

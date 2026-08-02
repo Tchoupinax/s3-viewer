@@ -5,30 +5,242 @@ on:
 
 
 jobs:
-  lint:
-    name: Check code quality 🫆
+  changes:
+    name: Detect changed paths
     runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      operator: ${{ steps.filter.outputs.operator }}
+      helm: ${{ steps.filter.outputs.helm }}
     steps:
-    - name: Check code quality 🫆
-      uses: tchoupinax/repo-config/shared-actions/steps/node/lint@v0
+    - name: Checkout
+      uses: actions/checkout@v7
       with:
+        fetch-depth: 0
+
+    - name: Detect changed paths
+      uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          app:
+            - 'apps/s3-viewer/**'
+            - 'pnpm-lock.yaml'
+            - 'pnpm-workspace.yaml'
+          operator:
+            - 'apps/s3-viewer-operator/**'
+          helm:
+            - 'charts/s3-viewer/**'
+
+  lint:
+    name: Check application code quality 🫆
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    steps:
+    - name: Check application code quality 🫆
+      uses: tchoupinax/repo-config/shared-actions/steps/node/lint@master
+      with:
+        workingDirectory: apps/s3-viewer
         nodeVersion: 26
-        throwOnError: false
+
+  lint-operator:
+    name: Check operator code quality 🫆
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.operator == 'true'
+    steps:
+    - name: Check operator code quality 🫆
+      uses: tchoupinax/repo-config/shared-actions/steps/rust/lint@master
+      with:
+        workingDirectory: apps/s3-viewer-operator
 
   build:
-    name: Check build success 🦫
+    name: Check application build success 🦫
     runs-on: ubuntu-latest
+    needs: [changes, lint]
+    if: |
+      needs.changes.outputs.app == 'true' &&
+      needs.lint.result == 'success'
     steps:
-    - name: Check build success 🦫
-      uses: tchoupinax/repo-config/shared-actions/steps/node/build@v0
+    - name: Check application build success 🦫
+      uses: tchoupinax/repo-config/shared-actions/steps/node/build@master
       with:
+        workingDirectory: apps/s3-viewer
         nodeVersion: 26
 
+  build-operator:
+    name: Check operator build success 🦫
+    runs-on: ubuntu-latest
+    needs: [changes, lint-operator]
+    if: |
+      needs.changes.outputs.operator == 'true' &&
+      needs.lint-operator.result == 'success'
+    steps:
+    - name: Check operator build success 🦫
+      uses: tchoupinax/repo-config/shared-actions/steps/rust/build@master
+      with:
+        workingDirectory: apps/s3-viewer-operator
+
+  build-application-docker:
+    name: Build container for application 🐳
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    permissions:
+      packages: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v4
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build application 🦫
+      uses: tchoupinax/repo-config/shared-actions/steps/node/build@master
+      with:
+        workingDirectory: apps/s3-viewer
+        nodeVersion: 26
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v6
+      with:
+        images: |
+          ghcr.io/tchoupinax/s3-viewer
+          tchoupinax/s3-viewer
+        flavor: latest=true
+        tags: |
+          type=raw,value=latest-${{ steps.date.outputs.date }}
+          type=raw,value=latest-${{ github.sha }}
+          type=raw,value=latest
+
+    - name: Build and push image
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: apps/s3-viewer/Dockerfile
+        push: true
+        platforms: linux/amd64,linux/arm64
+        # Layer + build cache in the registry so cargo deps stay warm across runs.
+        # mode=max keeps intermediate (builder) layers, which matters for zigbuild.
+        cache-from: type=registry,ref=ghcr.io/tchoupinax/s3-viewer:buildcache
+        cache-to: type=registry,ref=ghcr.io/tchoupinax/s3-viewer:buildcache,mode=max
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+
+  build-operator-docker:
+    name: Build container for operator 🐳
+    runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.operator == 'true'
+    permissions:
+      packages: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v4
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v6
+      with:
+        images: |
+          ghcr.io/tchoupinax/s3-viewer-operator
+          tchoupinax/s3-viewer-operator
+        flavor: latest=true
+        tags: |
+          type=raw,value=latest-${{ steps.date.outputs.date }}
+          type=raw,value=latest-${{ github.sha }}
+          type=raw,value=latest
+
+    - name: Build and push image
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: apps/s3-viewer-operator/Dockerfile
+        push: true
+        platforms: linux/amd64,linux/arm64
+        # Layer + build cache in the registry so cargo deps stay warm across runs.
+        # mode=max keeps intermediate (builder) layers, which matters for zigbuild.
+        cache-from: type=registry,ref=ghcr.io/tchoupinax/s3-viewer-operator:buildcache
+        cache-to: type=registry,ref=ghcr.io/tchoupinax/s3-viewer-operator:buildcache,mode=max
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+
+  publish-helm-chart:
+    name: Publish Helm chart (OCI) 📦
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.helm == 'true'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Set chart version from commit SHA
+      id: version
+      run: |
+        VERSION="0.0.0-${{ github.sha }}"
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+        sed -i "s/^version: .*/version: ${VERSION}/" charts/s3-viewer/Chart.yaml
+        sed -i "s/^appVersion: .*/appVersion: \"${{ github.sha }}\"/" charts/s3-viewer/Chart.yaml
+        sed -i "s/^    tag: .*/    tag: latest-${{ github.sha }}/" charts/s3-viewer/values.yaml
+        sed -i "s|^  defaultAppImage: .*|  defaultAppImage: ghcr.io/tchoupinax/s3-viewer:latest-${{ github.sha }}|" charts/s3-viewer/values.yaml
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+
+    - name: Lint chart
+      run: helm lint charts/s3-viewer
+
+    - name: Package chart
+      run: helm package charts/s3-viewer
+
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+
+    - name: Push chart to OCI registry
+      run: helm push s3-viewer-operator-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/tchoupinax/helm
+
   labels:
-    name: Autodetect labels 🔍
+    name: Autodetect labels 🔍
     runs-on: ubuntu-latest
     steps:
-    - name: Autodetect labels 🔍
+    - name: Autodetect labels 🔍
       uses: tchoupinax/repo-config/shared-actions/steps/dx/automatically-apply-labels@v0
       with:
         appId: ${{ secrets.DEPLOY_APP_ID }}

@@ -1,0 +1,86 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: s3viewerconfigs.s3viewer.dev
+spec:
+  group: s3viewer.dev
+  names:
+    singular: s3viewerconfig
+    kind: S3ViewerConfig
+    plural: s3viewerconfigs
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.accounts.length
+      name: Accounts
+      type: integer
+    - jsonPath: .status.message
+      name: Message
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: Auto-generated derived type for S3ViewerConfigSpec via `CustomResource`
+        properties:
+          spec:
+            properties:
+              accounts:
+                default: []
+                items:
+                  properties:
+                    accountKey:
+                      description: Env prefix key (e.g. BACKUPS -> S3_VIEWER_ACCOUNT_BACKUPS_*).
+                      type: string
+                    credentialsSecretRef:
+                      properties:
+                        accessKeyKey:
+                          type: string
+                        name:
+                          type: string
+                        secretKeyKey:
+                          type: string
+                      required:
+                      - accessKeyKey
+                      - name
+                      - secretKeyKey
+                      type: object
+                    endpoint:
+                      type: string
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    readOnly:
+                      default: false
+                      type: boolean
+                    region:
+                      type: string
+                  required:
+                  - accountKey
+                  - credentialsSecretRef
+                  - endpoint
+                  - id
+                  - name
+                  - region
+                  type: object
+                type: array
+            type: object
+          status:
+            nullable: true
+            properties:
+              message:
+                nullable: true
+                type: string
+              observedGeneration:
+                format: int64
+                nullable: true
+                type: integer
+            type: object
+        required:
+        - spec
+        title: S3ViewerConfig
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

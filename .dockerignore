@@ -1,4 +1,14 @@
-**
+# CI image (apps/s3-viewer/Dockerfile): only .output is copied; rest shrinks build context.
+# Tilt image (apps/s3-viewer/Dockerfile.tilt): builds Nuxt inside Docker from source.
 
-!.output
-!.output/**
+.git
+.github
+.turbo
+**/.turbo
+**/node_modules
+**/.nuxt
+**/.output
+!apps/s3-viewer/.output
+!apps/s3-viewer/.output/**
+apps/s3-viewer-operator/target
+dev/secret.yaml

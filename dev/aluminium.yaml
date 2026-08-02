@@ -1,0 +1,33 @@
+apiVersion: s3viewer.dev/v1
+kind: S3ViewerConfig
+metadata:
+  name: backups
+  namespace: aluminium
+
+spec:
+  accounts:
+    - accountKey: ALUMINIUM
+      id: minio-backups
+      name: aluminium
+      endpoint: http://minio-backups.minio.svc.cluster.local:9000
+      region: us-east-1
+      readOnly: false
+      credentialsSecretRef:
+        name: minio-backups-creds
+        accessKeyKey: access-key
+        secretKeyKey: secret-key
+
+---
+apiVersion: s3viewer.dev/v1
+kind: S3Viewer
+metadata:
+  name: backups
+  namespace: aluminium
+
+spec:
+  replicas: 1
+  service:
+    port: 3000
+    type: ClusterIP
+  ingress:
+    host: aluminium.127.0.0.1.nip.io
