@@ -193,16 +193,6 @@ jobs:
     - name: Push chart to OCI registry
       run: helm push s3-viewer-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/tchoupinax/helm
 
-    - name: Make chart package public
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        gh api \
-          --method PATCH \
-          -H "Accept: application/vnd.github+json" \
-          "/users/tchoupinax/packages/container/helm%2Fs3-viewer" \
-          --input - <<< '{"visibility":"public"}'
-
   labels:
     name: Autodetect labels 🔍
     runs-on: ubuntu-latest
