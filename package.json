@@ -11,6 +11,7 @@
     "down": "pnpm cluster:down",
     "cluster:up": "bash scripts/cluster-up.sh",
     "cluster:down": "bash scripts/cluster-down.sh",
+    "test:integration": "bash scripts/ci-integration-test.sh",
     "deploy": "tilt up",
     "deploy:down": "tilt down",
     "check": "gitleaks dir -v && gitleaks git -v",

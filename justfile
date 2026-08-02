@@ -13,3 +13,6 @@ deploy:
 
 deploy-down:
   tilt down
+
+test-integration:
+  bash scripts/ci-integration-test.sh

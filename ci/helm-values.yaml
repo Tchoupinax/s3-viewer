@@ -1,0 +1,6 @@
+operator:
+  image:
+    repository: s3-viewer-operator
+    tag: ci
+    pullPolicy: Never
+  defaultAppImage: s3-viewer:ci
