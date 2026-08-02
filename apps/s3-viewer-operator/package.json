@@ -1,6 +1,5 @@
 {
-  "name": "s3-viewer-operator",
-  "version": "0.1.0",
+  "name": "@s3-viewer/operator",
   "private": true,
   "scripts": {
     "build": "cargo build --release",
