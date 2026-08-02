@@ -30,7 +30,7 @@ spec:
           spec:
             properties:
               configNamespaces:
-                description: Namespaces to scan for S3ViewerConfig resources. Each config's accounts become buckets in the UI. Defaults to the S3Viewer's own namespace when unset or empty.
+                description: Namespaces to scan for S3ViewerConfig resources. Each config's accounts become buckets in the UI. Use `"*"` to scan every namespace. Defaults to the S3Viewer's own namespace when unset or empty.
                 items:
                   type: string
                 nullable: true

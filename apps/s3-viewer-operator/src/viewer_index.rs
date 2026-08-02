@@ -5,7 +5,7 @@ use kube::ResourceExt;
 use kube::runtime::reflector::ObjectRef;
 
 use crate::crd::S3Viewer;
-use crate::spec::watched_config_namespaces;
+use crate::spec::{watched_config_namespaces, ALL_CONFIG_NAMESPACES};
 
 #[derive(Clone, Default)]
 pub struct ViewerIndex {
@@ -18,11 +18,19 @@ impl ViewerIndex {
     }
 
     pub fn viewers_for_namespace(&self, namespace: &str) -> Vec<ObjectRef<S3Viewer>> {
-        self.by_namespace
-            .read()
-            .ok()
-            .and_then(|map| map.get(namespace).map(|set| set.iter().cloned().collect()))
-            .unwrap_or_default()
+        let Ok(map) = self.by_namespace.read() else {
+            return Vec::new();
+        };
+
+        let mut viewers = HashSet::new();
+        if let Some(set) = map.get(ALL_CONFIG_NAMESPACES) {
+            viewers.extend(set.iter().cloned());
+        }
+        if let Some(set) = map.get(namespace) {
+            viewers.extend(set.iter().cloned());
+        }
+
+        viewers.into_iter().collect()
     }
 }
 

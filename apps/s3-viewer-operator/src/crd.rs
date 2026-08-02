@@ -27,7 +27,7 @@ pub struct S3ViewerSpec {
     #[serde(default)]
     pub ingress: Option<IngressSpec>,
     /// Namespaces to scan for S3ViewerConfig resources. Each config's accounts become buckets in the UI.
-    /// Defaults to the S3Viewer's own namespace when unset or empty.
+    /// Use `"*"` to scan every namespace. Defaults to the S3Viewer's own namespace when unset or empty.
     #[serde(default)]
     pub config_namespaces: Option<Vec<String>>,
 }

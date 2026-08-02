@@ -6,6 +6,8 @@ use kube::ResourceExt;
 use crate::crd::{IngressSpec, S3AccountSpec, S3Viewer, S3ViewerConfig, ServiceSpec};
 use crate::Error;
 
+pub const ALL_CONFIG_NAMESPACES: &str = "*";
+
 pub struct EffectiveSpec {
     pub image: Option<String>,
     pub accounts: Vec<SourcedAccount>,
@@ -36,33 +38,57 @@ pub async fn resolve_effective_spec(
     })
 }
 
+pub fn watches_all_config_namespaces(viewer: &S3Viewer) -> bool {
+    viewer
+        .spec
+        .config_namespaces
+        .as_ref()
+        .is_some_and(|namespaces| namespaces.iter().any(|namespace| namespace == ALL_CONFIG_NAMESPACES))
+}
+
 async fn list_config_accounts(
     client: &kube::Client,
     viewer: &S3Viewer,
     viewer_namespace: &str,
 ) -> Result<Vec<SourcedAccount>, Error> {
-    let namespaces = config_namespaces(viewer, viewer_namespace);
     let mut accounts = Vec::new();
 
-    for namespace in namespaces {
+    if watches_all_config_namespaces(viewer) {
+        let api: Api<S3ViewerConfig> = Api::all(client.clone());
+        let list = api.list(&Default::default()).await?;
+        for config in list.items {
+            let namespace = config.namespace().unwrap_or_default();
+            accounts.extend(config_accounts_from_config(&config, &namespace));
+        }
+        return Ok(accounts);
+    }
+
+    for namespace in explicit_config_namespaces(viewer, viewer_namespace) {
         let api: Api<S3ViewerConfig> = Api::namespaced(client.clone(), &namespace);
         let list = api.list(&Default::default()).await?;
         for config in list.items {
-            let config_name = config.name_any();
-            for account in &config.spec.accounts {
-                accounts.push(SourcedAccount {
-                    account: account.clone(),
-                    credentials_namespace: namespace.clone(),
-                    config_name: Some(config_name.clone()),
-                });
-            }
+            accounts.extend(config_accounts_from_config(&config, &namespace));
         }
     }
 
     Ok(accounts)
 }
 
-fn config_namespaces(viewer: &S3Viewer, viewer_namespace: &str) -> Vec<String> {
+fn config_accounts_from_config(config: &S3ViewerConfig, namespace: &str) -> Vec<SourcedAccount> {
+    let config_name = config.name_any();
+    config
+        .spec
+        .accounts
+        .iter()
+        .map(|account| SourcedAccount {
+            account: account.clone(),
+            credentials_namespace: namespace.to_owned(),
+            config_name: Some(config_name.clone()),
+        })
+        .collect()
+}
+
+fn explicit_config_namespaces(viewer: &S3Viewer, viewer_namespace: &str) -> Vec<String> {
     match &viewer.spec.config_namespaces {
         Some(namespaces) if !namespaces.is_empty() => namespaces.clone(),
         Some(_) | None => vec![viewer_namespace.to_owned()],
@@ -106,7 +132,11 @@ fn dedupe_account_keys(accounts: impl IntoIterator<Item = SourcedAccount>) -> Re
 }
 
 pub fn watched_config_namespaces(viewer: &S3Viewer, viewer_namespace: &str) -> Vec<String> {
-    config_namespaces(viewer, viewer_namespace)
+    if watches_all_config_namespaces(viewer) {
+        return vec![ALL_CONFIG_NAMESPACES.to_owned()];
+    }
+
+    explicit_config_namespaces(viewer, viewer_namespace)
 }
 
 pub fn accounts_digest(accounts: &[SourcedAccount]) -> String {
@@ -139,4 +169,61 @@ pub fn describe_sourced_accounts(accounts: &[SourcedAccount]) -> String {
         })
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crd::S3ViewerSpec;
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+
+    fn viewer_with_config_namespaces(namespaces: Option<Vec<&str>>) -> S3Viewer {
+        S3Viewer {
+            metadata: ObjectMeta {
+                name: Some("main".to_owned()),
+                namespace: Some("s3-viewer".to_owned()),
+                ..Default::default()
+            },
+            spec: S3ViewerSpec {
+                image: None,
+                replicas: 1,
+                service: None,
+                ingress: None,
+                config_namespaces: namespaces.map(|values| {
+                    values.into_iter().map(ToOwned::to_owned).collect()
+                }),
+            },
+            status: None,
+        }
+    }
+
+    #[test]
+    fn watches_all_config_namespaces_when_wildcard_is_set() {
+        let viewer = viewer_with_config_namespaces(Some(vec!["*"]));
+        assert!(watches_all_config_namespaces(&viewer));
+        assert_eq!(
+            watched_config_namespaces(&viewer, "s3-viewer"),
+            vec!["*".to_owned()]
+        );
+    }
+
+    #[test]
+    fn watches_explicit_namespaces_when_configured() {
+        let viewer = viewer_with_config_namespaces(Some(vec!["iron", "copper"]));
+        assert!(!watches_all_config_namespaces(&viewer));
+        assert_eq!(
+            watched_config_namespaces(&viewer, "s3-viewer"),
+            vec!["iron".to_owned(), "copper".to_owned()]
+        );
+    }
+
+    #[test]
+    fn defaults_to_viewer_namespace_when_unset() {
+        let viewer = viewer_with_config_namespaces(None);
+        assert!(!watches_all_config_namespaces(&viewer));
+        assert_eq!(
+            watched_config_namespaces(&viewer, "s3-viewer"),
+            vec!["s3-viewer".to_owned()]
+        );
+    }
 }

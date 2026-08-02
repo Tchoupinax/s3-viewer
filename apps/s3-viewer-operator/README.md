@@ -57,7 +57,7 @@ Example spec fields:
 |-------|-------------|
 | `spec.image` | Container image (default `ghcr.io/tchoupinax/s3-viewer:latest`). |
 | `spec.replicas` | Deployment replicas (default `1`). |
-| `spec.configNamespaces` | Namespaces to scan for `S3ViewerConfig` accounts. |
+| `spec.configNamespaces` | Namespaces to scan for `S3ViewerConfig` accounts. Use `"*"` to scan every namespace. |
 | `spec.service.port` | Service port (default `3000`). |
 | `spec.ingress.host` | Optional ingress hostname. |
 
