@@ -6,11 +6,11 @@ on:
 
 jobs:
   lint:
-    name: Check applicationcode quality 🫆
+    name: Check application code quality 🫆
     runs-on: ubuntu-latest
     steps:
     - name: Check application code quality 🫆
-      uses: tchoupinax/repo-config/shared-actions/steps/node/lint@v0
+      uses: tchoupinax/repo-config/shared-actions/steps/node/lint@master
       with:
         workingDirectory: apps/s3-viewer
         nodeVersion: 26
@@ -30,7 +30,7 @@ jobs:
     needs: lint
     steps:
     - name: Check build success 🦫
-      uses: tchoupinax/repo-config/shared-actions/steps/node/build@v0
+      uses: tchoupinax/repo-config/shared-actions/steps/node/build@master
       with:
         nodeVersion: 26
 
