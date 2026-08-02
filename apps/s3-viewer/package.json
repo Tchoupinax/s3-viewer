@@ -10,7 +10,8 @@
     "lint:vue:check": "vue-tsc --noEmit",
     "preview": "nuxt preview",
     "upgrade": "npm-check-updates -i -c 1",
-    "watch": "nuxt dev"
+    "watch": "nuxt dev",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1097.0",
@@ -25,6 +26,7 @@
     "vue-router": "5.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.55.0",
     "@nuxt/eslint": "1.16.0",
     "@nuxt/hints": "1.1.4",
     "@types/node": "26.1.2",

@@ -6,6 +6,7 @@ CLUSTER_NAME="s3-viewer-ci"
 APP_IMAGE="s3-viewer:ci"
 OPERATOR_IMAGE="s3-viewer-operator:ci"
 HELM_RELEASE="s3-viewer-ci"
+E2E_BASE_URL="http://aluminium.127.0.0.1.nip.io"
 
 log() {
   echo "[ci] $*"
@@ -29,7 +30,7 @@ cleanup_cluster() {
 
 setup_cluster() {
   log "creating k3d cluster ${CLUSTER_NAME}"
-  k3d cluster create --config "${ROOT_DIR}/ci/k3d.yml"
+  k3d cluster create --config "${ROOT_DIR}/k3d.yml"
   export KUBECONFIG="$(k3d kubeconfig write "${CLUSTER_NAME}")"
   log "kubeconfig: ${KUBECONFIG}"
   kubectl cluster-info
@@ -133,6 +134,37 @@ verify_runtime() {
     || fail "aluminium buckets response missing minio-backups account"
 }
 
+wait_for_ingress() {
+  log "waiting for aluminium ingress at ${E2E_BASE_URL}"
+
+  for _ in $(seq 1 60); do
+    if kubectl get ingress backups-s3-viewer -n aluminium >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+
+  kubectl get ingress backups-s3-viewer -n aluminium >/dev/null 2>&1 \
+    || fail "ingress backups-s3-viewer not found in aluminium namespace"
+
+  for _ in $(seq 1 60); do
+    if curl -sf "${E2E_BASE_URL}/api/health" >/dev/null; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  fail "ingress ${E2E_BASE_URL} did not become reachable"
+}
+
+run_e2e_tests() {
+  log "running Playwright e2e tests against ${E2E_BASE_URL}"
+  wait_for_ingress
+
+  export E2E_BASE_URL
+  pnpm --filter @s3-viewer/app test:e2e
+}
+
 verify_secret_rollout() {
   log "verifying deployment restarts when account secret changes"
   local generation_before generation_after
@@ -175,6 +207,8 @@ main() {
   require_command kubectl
   require_command helm
   require_command jq
+  require_command curl
+  require_command pnpm
 
   cd "${ROOT_DIR}"
 
@@ -185,6 +219,7 @@ main() {
   apply_workloads
   wait_for_viewers
   verify_runtime
+  run_e2e_tests
   verify_secret_rollout
 
   log "integration tests passed"
