@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check operator build success 🦫
-      uses: tchoupinax/repo-config/shared-actions/steps/rust/build
+      uses: tchoupinax/repo-config/shared-actions/steps/rust/build@master
   #build-application-docker:
   #  name: Build container for application 🐳
   #  runs-on: ubuntu-24.04
