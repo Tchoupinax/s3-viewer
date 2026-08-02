@@ -4,6 +4,7 @@ use kube::Api;
 use kube::ResourceExt;
 
 use crate::crd::{IngressSpec, S3AccountSpec, S3Viewer, S3ViewerConfig, ServiceSpec};
+use crate::logging;
 use crate::Error;
 
 pub const ALL_CONFIG_NAMESPACES: &str = "*";
@@ -11,8 +12,21 @@ pub const ALL_CONFIG_NAMESPACES: &str = "*";
 pub struct EffectiveSpec {
     pub image: Option<String>,
     pub accounts: Vec<SourcedAccount>,
+    pub configs: Vec<ResolvedConfig>,
     pub service: Option<ServiceSpec>,
     pub ingress: Option<IngressSpec>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedConfig {
+    pub namespace: String,
+    pub config: S3ViewerConfig,
+}
+
+impl ResolvedConfig {
+    pub fn sourced_accounts(&self) -> Vec<SourcedAccount> {
+        config_accounts_from_config(&self.config, &self.namespace)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -27,15 +41,63 @@ pub async fn resolve_effective_spec(
     namespace: &str,
     viewer: &S3Viewer,
 ) -> Result<EffectiveSpec, Error> {
-    let config_accounts = list_config_accounts(client, viewer, namespace).await?;
+    let configs = list_resolved_configs(client, viewer, namespace).await?;
+    let config_accounts = configs
+        .iter()
+        .flat_map(ResolvedConfig::sourced_accounts)
+        .collect::<Vec<_>>();
     let accounts = dedupe_account_keys(config_accounts)?;
 
     Ok(EffectiveSpec {
         image: viewer.spec.image.clone(),
         accounts,
+        configs,
         service: viewer.spec.service.clone(),
         ingress: viewer.spec.ingress.clone(),
     })
+}
+
+pub async fn list_resolved_configs(
+    client: &kube::Client,
+    viewer: &S3Viewer,
+    viewer_namespace: &str,
+) -> Result<Vec<ResolvedConfig>, Error> {
+    let mut configs = Vec::new();
+
+    if watches_all_config_namespaces(viewer) {
+        let api: Api<S3ViewerConfig> = Api::all(client.clone());
+        let list = api.list(&Default::default()).await?;
+        logging::info(&format!(
+            "wildcard configNamespaces: found {} S3ViewerConfig(s) cluster-wide",
+            list.items.len()
+        ));
+        for config in list.items {
+            let namespace = config.namespace().unwrap_or_default();
+            let config_name = config.name_any();
+            let account_count = config.spec.accounts.len();
+            logging::info(&format!(
+                "wildcard configNamespaces: including {namespace}/{config_name} ({account_count} account(s))"
+            ));
+            configs.push(ResolvedConfig {
+                namespace: namespace.clone(),
+                config,
+            });
+        }
+        return Ok(configs);
+    }
+
+    for namespace in explicit_config_namespaces(viewer, viewer_namespace) {
+        let api: Api<S3ViewerConfig> = Api::namespaced(client.clone(), &namespace);
+        let list = api.list(&Default::default()).await?;
+        for config in list.items {
+            configs.push(ResolvedConfig {
+                namespace: namespace.clone(),
+                config,
+            });
+        }
+    }
+
+    Ok(configs)
 }
 
 pub fn watches_all_config_namespaces(viewer: &S3Viewer) -> bool {
@@ -44,34 +106,6 @@ pub fn watches_all_config_namespaces(viewer: &S3Viewer) -> bool {
         .config_namespaces
         .as_ref()
         .is_some_and(|namespaces| namespaces.iter().any(|namespace| namespace == ALL_CONFIG_NAMESPACES))
-}
-
-async fn list_config_accounts(
-    client: &kube::Client,
-    viewer: &S3Viewer,
-    viewer_namespace: &str,
-) -> Result<Vec<SourcedAccount>, Error> {
-    let mut accounts = Vec::new();
-
-    if watches_all_config_namespaces(viewer) {
-        let api: Api<S3ViewerConfig> = Api::all(client.clone());
-        let list = api.list(&Default::default()).await?;
-        for config in list.items {
-            let namespace = config.namespace().unwrap_or_default();
-            accounts.extend(config_accounts_from_config(&config, &namespace));
-        }
-        return Ok(accounts);
-    }
-
-    for namespace in explicit_config_namespaces(viewer, viewer_namespace) {
-        let api: Api<S3ViewerConfig> = Api::namespaced(client.clone(), &namespace);
-        let list = api.list(&Default::default()).await?;
-        for config in list.items {
-            accounts.extend(config_accounts_from_config(&config, &namespace));
-        }
-    }
-
-    Ok(accounts)
 }
 
 fn config_accounts_from_config(config: &S3ViewerConfig, namespace: &str) -> Vec<SourcedAccount> {

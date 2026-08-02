@@ -13,10 +13,9 @@ use kube::{Api, Client, Config, Resource, ResourceExt};
 use serde_json::json;
 use s3_viewer_operator::crd::{S3Viewer, S3ViewerConfig, S3ViewerStatus};
 use s3_viewer_operator::resources::{
-    build_account_secret, cleanup_legacy_per_config_account_secrets, delete_secret_if_present,
-    deploy_s3viewer, ingress_url, resource_base_name, service_url,
+    cleanup_legacy_per_config_account_secrets, cleanup_viewer_account_mount_secrets,
+    deploy_s3viewer, ingress_url, resource_base_name, service_url, sync_config_account_secrets,
 };
-use s3_viewer_operator::secrets::build_account_env_data;
 use s3_viewer_operator::spec::{
     describe_sourced_accounts, resolve_effective_spec, watched_config_namespaces,
 };
@@ -272,41 +271,26 @@ async fn provision_s3viewer(
         describe_sourced_accounts(&effective.accounts)
     ));
 
-    let secret_name = resource_base_name(viewer);
-    let secret_data = if effective.accounts.is_empty() {
+    let (secret_data, mount_secret_names) = if effective.accounts.is_empty() {
         log_info(&format!(
             "no S3ViewerConfig accounts for {} in configNamespaces [{}]; deploying without accounts",
             format_reconcile_target(namespace, &viewer.name_any()),
             config_namespaces.join(",")
         ));
-        std::collections::BTreeMap::new()
+        cleanup_legacy_per_config_account_secrets(&context.client, namespace, viewer).await?;
+        cleanup_viewer_account_mount_secrets(&context.client, namespace, viewer, &[]).await?;
+        (std::collections::BTreeMap::new(), Vec::new())
     } else {
         log_info(&format!(
             "loading account credentials for {}",
             format_reconcile_target(namespace, &viewer.name_any())
         ));
-        build_account_env_data(&context.client, &effective.accounts).await?
-    };
-
-    let accounts_secret_name = if effective.accounts.is_empty() {
-        delete_secret_if_present(&context.client, namespace, &secret_name).await?;
-        None
-    } else {
-        let secret = build_account_secret(viewer, secret_data.clone());
-        let key_count =
-            s3_viewer_operator::resources::ensure_secret(&context.client, namespace, &secret)
+        let mounts =
+            sync_config_account_secrets(&context.client, viewer, namespace, &effective.configs)
                 .await?;
-        log_info(&format!(
-            "secret {}/{} updated ({} env keys, digest accounts: {})",
-            namespace,
-            secret_name,
-            key_count,
-            s3_viewer_operator::spec::accounts_digest(&effective.accounts)
-        ));
-        Some(secret_name)
+        cleanup_legacy_per_config_account_secrets(&context.client, namespace, viewer).await?;
+        (mounts.merged_secret_data, mounts.mount_secret_names)
     };
-
-    cleanup_legacy_per_config_account_secrets(&context.client, namespace, viewer).await?;
 
     let deployment_name = resource_base_name(viewer);
     log_info(&format!(
@@ -324,7 +308,7 @@ async fn provision_s3viewer(
         namespace,
         viewer,
         &effective,
-        accounts_secret_name.as_deref(),
+        &mount_secret_names,
         &secret_data,
     )
     .await?;

@@ -2,8 +2,9 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec, Secret, SecretVolumeSource,
-    Service, ServicePort, ServiceSpec, Volume, VolumeMount,
+    Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec, ProjectedVolumeSource,
+    Secret, SecretProjection, SecretVolumeSource, Service, ServicePort, ServiceSpec, Volume,
+    VolumeMount, VolumeProjection,
 };
 use k8s_openapi::api::networking::v1::{
     HTTPIngressPath, HTTPIngressRuleValue, Ingress, IngressBackend, IngressRule,
@@ -14,8 +15,9 @@ use k8s_openapi::ByteString;
 use kube::api::{ListParams, Patch, PatchParams, PostParams};
 use kube::{Api, Client, Resource, ResourceExt};
 
-use crate::crd::{IngressSpec as ViewerIngressSpec, S3Viewer, ServiceSpec as ViewerServiceSpec};
-use crate::spec::EffectiveSpec;
+use crate::crd::{IngressSpec as ViewerIngressSpec, S3Viewer, S3ViewerConfig, ServiceSpec as ViewerServiceSpec};
+use crate::secrets::build_account_env_data;
+use crate::spec::{EffectiveSpec, ResolvedConfig};
 use crate::Error;
 
 const MANAGED_BY: &str = "s3-viewer-operator";
@@ -141,9 +143,74 @@ fn secret_data_digest(data: &BTreeMap<String, ByteString>) -> String {
     parts.join("|")
 }
 
-pub fn build_account_secret(viewer: &S3Viewer, data: BTreeMap<String, ByteString>) -> Secret {
+pub struct AccountSecretMounts {
+    pub merged_secret_data: std::collections::BTreeMap<String, ByteString>,
+    pub mount_secret_names: Vec<String>,
+}
+
+pub fn config_account_secret_name(config: &S3ViewerConfig) -> String {
+    format!("{}-accounts", config.name_any())
+}
+
+fn viewer_mount_secret_name(viewer: &S3Viewer, config: &ResolvedConfig) -> String {
+    format!(
+        "{}-{}-{}-accounts",
+        resource_base_name(viewer),
+        config.namespace,
+        config.config.name_any()
+    )
+}
+
+fn config_owner_reference(config: &S3ViewerConfig) -> OwnerReference {
+    OwnerReference {
+        api_version: S3ViewerConfig::api_version(&()).to_string(),
+        kind: S3ViewerConfig::kind(&()).to_string(),
+        name: config.name_any(),
+        uid: config.meta().uid.clone().unwrap_or_default(),
+        controller: Some(true),
+        block_owner_deletion: Some(true),
+    }
+}
+
+fn config_secret_labels(config: &ResolvedConfig) -> BTreeMap<String, String> {
+    let mut labels = BTreeMap::new();
+    labels.insert("app.kubernetes.io/managed-by".to_owned(), MANAGED_BY.to_owned());
+    labels.insert(
+        "s3viewer.dev/config-namespace".to_owned(),
+        config.namespace.clone(),
+    );
+    labels.insert(
+        "s3viewer.dev/config-name".to_owned(),
+        config.config.name_any(),
+    );
+    labels
+}
+
+fn viewer_mount_secret_labels(viewer: &S3Viewer, config: &ResolvedConfig) -> BTreeMap<String, String> {
+    let mut labels = config_secret_labels(config);
+    labels.insert(
+        "app.kubernetes.io/instance".to_owned(),
+        viewer.name_any(),
+    );
+    labels.insert(
+        "s3viewer.dev/viewer-instance".to_owned(),
+        viewer.name_any(),
+    );
+    labels
+}
+
+pub fn build_config_account_secret(
+    config: &ResolvedConfig,
+    data: BTreeMap<String, ByteString>,
+) -> Secret {
     Secret {
-        metadata: object_meta(viewer, &resource_base_name(viewer)),
+        metadata: ObjectMeta {
+            name: Some(config_account_secret_name(&config.config)),
+            namespace: Some(config.namespace.clone()),
+            labels: Some(config_secret_labels(config)),
+            owner_references: Some(vec![config_owner_reference(&config.config)]),
+            ..Default::default()
+        },
         type_: Some("Opaque".to_owned()),
         data: Some(data),
         string_data: None,
@@ -151,16 +218,153 @@ pub fn build_account_secret(viewer: &S3Viewer, data: BTreeMap<String, ByteString
     }
 }
 
-fn build_accounts_volume(secret_name: &str) -> Volume {
-    Volume {
+fn build_viewer_mount_secret(
+    viewer: &S3Viewer,
+    viewer_namespace: &str,
+    config: &ResolvedConfig,
+    data: BTreeMap<String, ByteString>,
+) -> Secret {
+    Secret {
+        metadata: ObjectMeta {
+            name: Some(viewer_mount_secret_name(viewer, config)),
+            namespace: Some(viewer_namespace.to_owned()),
+            labels: Some(viewer_mount_secret_labels(viewer, config)),
+            owner_references: Some(vec![owner_reference(viewer)]),
+            ..Default::default()
+        },
+        type_: Some("Opaque".to_owned()),
+        data: Some(data),
+        string_data: None,
+        ..Default::default()
+    }
+}
+
+pub async fn sync_config_account_secrets(
+    client: &Client,
+    viewer: &S3Viewer,
+    viewer_namespace: &str,
+    configs: &[ResolvedConfig],
+) -> Result<AccountSecretMounts, Error> {
+    let mut merged_secret_data = BTreeMap::new();
+    let mut mount_secret_names = Vec::new();
+
+    for config in configs {
+        if config.config.spec.accounts.is_empty() {
+            continue;
+        }
+
+        let sourced_accounts = config.sourced_accounts();
+        let secret_data = build_account_env_data(client, &sourced_accounts).await?;
+        let key_count = secret_data.len();
+
+        let config_secret = build_config_account_secret(config, secret_data.clone());
+        ensure_secret(client, &config.namespace, &config_secret).await?;
+        crate::logging::info(&format!(
+            "secret {}/{} updated ({} env keys, owner: S3ViewerConfig/{})",
+            config.namespace,
+            config_account_secret_name(&config.config),
+            key_count,
+            config.config.name_any()
+        ));
+
+        let mount_name = if config.namespace == viewer_namespace {
+            config_account_secret_name(&config.config)
+        } else {
+            let mount_secret =
+                build_viewer_mount_secret(viewer, viewer_namespace, config, secret_data.clone());
+            let mount_name = mount_secret
+                .metadata
+                .name
+                .clone()
+                .unwrap_or_default();
+            ensure_secret(client, viewer_namespace, &mount_secret).await?;
+            crate::logging::info(&format!(
+                "secret {viewer_namespace}/{mount_name} updated ({} env keys, mount replica for S3ViewerConfig {}/{})",
+                key_count,
+                config.namespace,
+                config.config.name_any()
+            ));
+            mount_name
+        };
+
+        mount_secret_names.push(mount_name);
+        merged_secret_data.extend(secret_data);
+    }
+
+    cleanup_viewer_account_mount_secrets(client, viewer_namespace, viewer, &mount_secret_names)
+        .await?;
+    delete_secret_if_present(client, viewer_namespace, &resource_base_name(viewer)).await?;
+
+    Ok(AccountSecretMounts {
+        merged_secret_data,
+        mount_secret_names,
+    })
+}
+
+pub async fn cleanup_viewer_account_mount_secrets(
+    client: &Client,
+    viewer_namespace: &str,
+    viewer: &S3Viewer,
+    active_mount_names: &[String],
+) -> Result<(), Error> {
+    let api: Api<Secret> = Api::namespaced(client.clone(), viewer_namespace);
+    let label_selector = format!(
+        "app.kubernetes.io/managed-by={},s3viewer.dev/viewer-instance={}",
+        MANAGED_BY,
+        viewer.name_any()
+    );
+    let list = api
+        .list(&ListParams::default().labels(&label_selector))
+        .await?;
+    let active_names: std::collections::HashSet<&str> =
+        active_mount_names.iter().map(String::as_str).collect();
+
+    for secret in list.items {
+        let name = secret.name_any();
+        if !active_names.contains(name.as_str()) {
+            delete_secret_if_present(client, viewer_namespace, &name).await?;
+        }
+    }
+
+    Ok(())
+}
+
+fn build_accounts_volume(secret_names: &[String]) -> Option<Volume> {
+    if secret_names.is_empty() {
+        return None;
+    }
+
+    if secret_names.len() == 1 {
+        return Some(Volume {
+            name: ACCOUNTS_VOLUME_NAME.to_owned(),
+            secret: Some(SecretVolumeSource {
+                secret_name: Some(secret_names[0].clone()),
+                optional: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+    }
+
+    Some(Volume {
         name: ACCOUNTS_VOLUME_NAME.to_owned(),
-        secret: Some(SecretVolumeSource {
-            secret_name: Some(secret_name.to_owned()),
-            optional: Some(true),
+        projected: Some(ProjectedVolumeSource {
+            sources: Some(
+                secret_names
+                    .iter()
+                    .map(|name| VolumeProjection {
+                        secret: Some(SecretProjection {
+                            name: name.clone(),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    })
+                    .collect(),
+            ),
             ..Default::default()
         }),
         ..Default::default()
-    }
+    })
 }
 
 fn build_container_env(service_port: i32, mount_accounts: bool) -> Vec<EnvVar> {
@@ -196,7 +400,7 @@ fn build_container_env(service_port: i32, mount_accounts: bool) -> Vec<EnvVar> {
 pub fn build_deployment(
     viewer: &S3Viewer,
     effective: &EffectiveSpec,
-    accounts_secret_name: Option<&str>,
+    mount_secret_names: &[String],
     secret_data: &BTreeMap<String, ByteString>,
 ) -> Deployment {
     let service = service_spec(effective);
@@ -212,10 +416,10 @@ pub fn build_deployment(
         ..Default::default()
     };
 
-    let mount_accounts = accounts_secret_name.is_some();
-    let (volumes, volume_mounts) = if let Some(secret_name) = accounts_secret_name {
+    let mount_accounts = !mount_secret_names.is_empty();
+    let (volumes, volume_mounts) = if let Some(volume) = build_accounts_volume(mount_secret_names) {
         (
-            Some(vec![build_accounts_volume(secret_name)]),
+            Some(vec![volume]),
             Some(vec![accounts_volume_mount]),
         )
     } else {
@@ -338,10 +542,10 @@ pub async fn deploy_s3viewer(
     namespace: &str,
     viewer: &S3Viewer,
     effective: &EffectiveSpec,
-    accounts_secret_name: Option<&str>,
+    mount_secret_names: &[String],
     secret_data: &BTreeMap<String, ByteString>,
 ) -> Result<(), Error> {
-    let deployment = build_deployment(viewer, effective, accounts_secret_name, secret_data);
+    let deployment = build_deployment(viewer, effective, mount_secret_names, secret_data);
     let service = build_service(viewer, effective);
 
     ensure_deployment(client, namespace, &deployment).await?;
@@ -422,7 +626,9 @@ pub async fn cleanup_legacy_per_config_account_secrets(
 
     for secret in list.items {
         let name = secret.name_any();
-        if name != active_name && name.starts_with(&legacy_prefix) && name.ends_with("-accounts") {
+        if name == active_name
+            || (name.starts_with(&legacy_prefix) && name.ends_with("-accounts"))
+        {
             delete_secret_if_present(client, viewer_namespace, &name).await?;
         }
     }
