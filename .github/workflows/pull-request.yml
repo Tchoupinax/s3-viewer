@@ -6,81 +6,138 @@ on:
 
 jobs:
   lint:
-    name: Check code quality 🫆
+    name: Check code quality 🫆
     runs-on: ubuntu-latest
     steps:
-    - name: Check code quality 🫆
+    - name: Check code quality 🫆
       uses: tchoupinax/repo-config/shared-actions/steps/node/lint@v0
       with:
         nodeVersion: 26
         throwOnError: false
 
   build:
-    name: Check build success 🦫
+    name: Check build success 🦫
     runs-on: ubuntu-latest
     steps:
-    - name: Check build success 🦫
+    - name: Check build success 🦫
       uses: tchoupinax/repo-config/shared-actions/steps/node/build@v0
       with:
         nodeVersion: 26
 
-  build-operator-docker:
-    name: Build container for operator 🐳
-    runs-on: ubuntu-24.04
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v7
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
-
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v4
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Login to Docker Hub
-      uses: docker/login-action@v4
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Docker meta
-      id: meta
-      uses: docker/metadata-action@v6
-      with:
-        images: |
-          ghcr.io/tchoupinax/s3-viewer-operator
-          tchoupinax/s3-viewer-operator
-        flavor: latest=true
-        tags: |
-          type=raw,value=latest-${{ steps.date.outputs.date }}
-          type=raw,value=latest-${{ github.sha }}
-          type=raw,value=latest
-
-    - name: Build and push image
-      uses: docker/build-push-action@v7
-      with:
-        context: .
-        file: apps/s3-viewer-operator/Dockerfile
-        push: true
-        platforms: linux/amd64,linux/arm64
-        # Layer + build cache in the registry so cargo deps stay warm across runs.
-        # mode=max keeps intermediate (builder) layers, which matters for zigbuild.
-        cache-from: type=registry,ref=ghcr.io/tchoupinax/s3-viewer-operator:buildcache
-        cache-to: type=registry,ref=ghcr.io/tchoupinax/s3-viewer-operator:buildcache,mode=max
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-
-  labels:
-    name: Autodetect labels 🔍
+  build-operator:
+    name: Check operator build success 🦫
     runs-on: ubuntu-latest
     steps:
-    - name: Autodetect labels 🔍
-      uses: tchoupinax/repo-config/shared-actions/steps/dx/automatically-apply-labels@v0
-      with:
-        appId: ${{ secrets.DEPLOY_APP_ID }}
-        privateKey: ${{ secrets.DEPLOY_APP_KEY }}
+    - name: Check operator build success 🦫
+      uses: tchoupinax/repo-config/shared-actions/steps/rust/build
+  #build-application-docker:
+  #  name: Build container for application 🐳
+  #  runs-on: ubuntu-24.04
+
+  #  steps:
+  #  - name: Checkout
+  #    uses: actions/checkout@v7
+
+  #  - name: Set up Docker Buildx
+  #    uses: docker/setup-buildx-action@v4
+
+  #  - name: Log in to GitHub Container Registry
+  #    uses: docker/login-action@v4
+  #    with:
+  #      registry: ghcr.io
+  #      username: ${{ github.actor }}
+  #      password: ${{ secrets.GITHUB_TOKEN }}
+
+  #  - name: Login to Docker Hub
+  #    uses: docker/login-action@v4
+  #    with:
+  #      username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #      password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  #  - name: Docker meta
+  #    id: meta
+  #    uses: docker/metadata-action@v6
+  #    with:
+  #      images: |
+  #        ghcr.io/tchoupinax/s3-viewer
+  #        tchoupinax/s3-viewer
+  #      flavor: latest=true
+  #      tags: |
+  #        type=raw,value=latest-${{ steps.date.outputs.date }}
+  #        type=raw,value=latest-${{ github.sha }}
+  #        type=raw,value=latest
+
+  #  - name: Build and push image
+  #    uses: docker/build-push-action@v7
+  #    with:
+  #      context: .
+  #      file: apps/s3-viewer/Dockerfile
+  #      push: true
+  #      platforms: linux/amd64,linux/arm64
+  #      # Layer + build cache in the registry so cargo deps stay warm across runs.
+  #      # mode=max keeps intermediate (builder) layers, which matters for zigbuild.
+  #      cache-from: type=registry,ref=ghcr.io/tchoupinax/s3-viewer:buildcache
+  #      cache-to: type=registry,ref=ghcr.io/tchoupinax/s3-viewer:buildcache,mode=max
+  #      tags: ${{ steps.meta.outputs.tags }}
+  #      labels: ${{ steps.meta.outputs.labels }}
+
+  #build-operator-docker:
+  #  name: Build container for operator 🐳
+  #  runs-on: ubuntu-24.04
+
+  #  steps:
+  #  - name: Checkout
+  #    uses: actions/checkout@v7
+
+  #  - name: Set up Docker Buildx
+  #    uses: docker/setup-buildx-action@v4
+
+  #  - name: Log in to GitHub Container Registry
+  #    uses: docker/login-action@v4
+  #    with:
+  #      registry: ghcr.io
+  #      username: ${{ github.actor }}
+  #      password: ${{ secrets.GITHUB_TOKEN }}
+
+  #  - name: Login to Docker Hub
+  #    uses: docker/login-action@v4
+  #    with:
+  #      username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #      password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+  #  - name: Docker meta
+  #    id: meta
+  #    uses: docker/metadata-action@v6
+  #    with:
+  #      images: |
+  #        ghcr.io/tchoupinax/s3-viewer-operator
+  #        tchoupinax/s3-viewer-operator
+  #      flavor: latest=true
+  #      tags: |
+  #        type=raw,value=latest-${{ steps.date.outputs.date }}
+  #        type=raw,value=latest-${{ github.sha }}
+  #        type=raw,value=latest
+
+  #  - name: Build and push image
+  #    uses: docker/build-push-action@v7
+  #    with:
+  #      context: .
+  #      file: apps/s3-viewer-operator/Dockerfile
+  #      push: true
+  #      platforms: linux/amd64,linux/arm64
+  #      # Layer + build cache in the registry so cargo deps stay warm across runs.
+  #      # mode=max keeps intermediate (builder) layers, which matters for zigbuild.
+  #      cache-from: type=registry,ref=ghcr.io/tchoupinax/s3-viewer-operator:buildcache
+  #      cache-to: type=registry,ref=ghcr.io/tchoupinax/s3-viewer-operator:buildcache,mode=max
+  #      tags: ${{ steps.meta.outputs.tags }}
+  #      labels: ${{ steps.meta.outputs.labels }}
+
+  #labels:
+  #  name: Autodetect labels 🔍
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #  - name: Autodetect labels 🔍
+  #    uses: tchoupinax/repo-config/shared-actions/steps/dx/automatically-apply-labels@v0
+  #    with:
+  #      appId: ${{ secrets.DEPLOY_APP_ID }}
+  #      privateKey: ${{ secrets.DEPLOY_APP_KEY }}
