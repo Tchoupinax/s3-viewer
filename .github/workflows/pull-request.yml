@@ -28,8 +28,6 @@ jobs:
     name: Check operator build success 🦫
     runs-on: ubuntu-latest
     steps:
-    - run: pwd
-    - run: ls -la
     - name: Check operator build success 🦫
       uses: tchoupinax/repo-config/shared-actions/steps/rust/build@master
       with:
