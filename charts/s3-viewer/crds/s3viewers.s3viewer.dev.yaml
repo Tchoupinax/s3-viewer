@@ -5,11 +5,9 @@ metadata:
 spec:
   group: s3viewer.dev
   names:
-    categories: []
+    singular: s3viewer
     kind: S3Viewer
     plural: s3viewers
-    shortNames: []
-    singular: s3viewer
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
