@@ -13,6 +13,7 @@ jobs:
       uses: tchoupinax/repo-config/shared-actions/steps/node/lint@v0
       with:
         workingDirectory: apps/s3-viewer
+        nodeVersion: 26
 
   lint-operator:
     name: Check operator code quality 🫆
