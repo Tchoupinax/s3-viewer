@@ -27,6 +27,7 @@ jobs:
   build-operator:
     name: Check operator build success 🦫
     runs-on: ubuntu-latest
+
     steps:
     - name: Check operator build success 🦫
       uses: tchoupinax/repo-config/shared-actions/steps/rust/build@master
