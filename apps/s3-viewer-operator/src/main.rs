@@ -20,6 +20,7 @@ use s3_viewer_operator::secrets::build_account_env_data;
 use s3_viewer_operator::spec::{
     describe_sourced_accounts, resolve_effective_spec, watched_config_namespaces,
 };
+use s3_viewer_operator::logging;
 use s3_viewer_operator::viewer_index::{register_viewer, unregister_viewer, ViewerIndex};
 use s3_viewer_operator::Error;
 use tokio::time::Duration;
@@ -47,7 +48,7 @@ async fn main() {
         viewer_index: ViewerIndex::new(),
     });
 
-    log_info(&format!(
+    logging::info(&format!(
         "s3-viewer-operator started (Kubernetes API: {cluster_url})"
     ));
 
@@ -78,11 +79,27 @@ async fn main() {
 }
 
 fn log_info(message: &str) {
-    println!("[{}] {}", Utc::now().to_rfc3339(), message);
+    logging::info(message);
 }
 
 fn log_error(message: &str) {
-    eprintln!("[{}] ERROR {}", Utc::now().to_rfc3339(), message);
+    logging::error(message);
+}
+
+async fn handle_reconcile_error(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+    error: &Error,
+) {
+    log_reconcile_error(namespace, name, error);
+    if let Err(status_err) = publish_error_status(client, name, namespace, error).await {
+        log_error(&format!(
+            "failed to write error status for {}: {}",
+            format_reconcile_target(namespace, name),
+            status_err
+        ));
+    }
 }
 
 fn format_reconcile_target(namespace: &str, name: &str) -> String {
@@ -162,12 +179,33 @@ async fn reconcile(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<A
     let viewer = match fetch_viewer(&context.client, &namespace, &name).await {
         Ok(fresh) => Arc::new(fresh),
         Err(Error::KubeError { source }) if is_not_found(&source) => viewer,
-        Err(err) => return Err(err),
+        Err(err) => {
+            handle_reconcile_error(&context.client, &namespace, &name, &err).await;
+            return Err(err);
+        }
     };
 
     register_viewer(&context.viewer_index, &viewer);
 
-    let action = match determine_action(&viewer) {
+    match reconcile_action(viewer, context.clone()).await {
+        Ok(action) => Ok(action),
+        Err(error) => {
+            handle_reconcile_error(&context.client, &namespace, &name, &error).await;
+            Err(error)
+        }
+    }
+}
+
+async fn reconcile_action(
+    viewer: Arc<S3Viewer>,
+    context: Arc<ContextData>,
+) -> Result<Action, Error> {
+    let namespace = viewer.namespace().ok_or_else(|| {
+        Error::UserInputError("Expected S3Viewer resource to be namespaced.".to_owned())
+    })?;
+    let name = viewer.name_any();
+
+    match determine_action(&viewer) {
         ViewerAction::Register => {
             log_info(&format!(
                 "s3viewer created: {namespace}/{name} (generation {})",
@@ -202,20 +240,7 @@ async fn reconcile(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<A
             provision_s3viewer(&context, &namespace, &viewer).await?;
             Ok(Action::requeue(Duration::from_secs(30)))
         }
-    };
-
-    if let Err(error) = &action {
-        log_reconcile_error(&namespace, &name, error);
-        if let Err(status_err) = publish_error_status(&context.client, &name, &namespace, error).await {
-            log_error(&format!(
-                "failed to write error status for {}: {}",
-                format_reconcile_target(&namespace, &name),
-                status_err
-            ));
-        }
     }
-
-    action
 }
 
 async fn fetch_viewer(client: &Client, namespace: &str, name: &str) -> Result<S3Viewer, Error> {
@@ -256,6 +281,10 @@ async fn provision_s3viewer(
         ));
         std::collections::BTreeMap::new()
     } else {
+        log_info(&format!(
+            "loading account credentials for {}",
+            format_reconcile_target(namespace, &viewer.name_any())
+        ));
         build_account_env_data(&context.client, &effective.accounts).await?
     };
 
@@ -279,6 +308,17 @@ async fn provision_s3viewer(
 
     cleanup_legacy_per_config_account_secrets(&context.client, namespace, viewer).await?;
 
+    let deployment_name = resource_base_name(viewer);
+    log_info(&format!(
+        "deploying workload {namespace}/{deployment_name} (replicas: {}, ingress: {})",
+        viewer.spec.replicas,
+        effective
+            .ingress
+            .as_ref()
+            .map(|i| i.host.as_str())
+            .unwrap_or("none")
+    ));
+
     deploy_s3viewer(
         &context.client,
         namespace,
@@ -288,6 +328,10 @@ async fn provision_s3viewer(
         &secret_data,
     )
     .await?;
+
+    log_info(&format!(
+        "workload {namespace}/{deployment_name} applied successfully"
+    ));
 
     let mut url = service_url(namespace, viewer, &effective);
     if let Some(ingress_spec) = &effective.ingress {

@@ -4,6 +4,7 @@ use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::ByteString;
 use kube::Api;
 
+use crate::logging;
 use crate::spec::SourcedAccount;
 use crate::Error;
 
@@ -20,6 +21,8 @@ pub async fn build_account_env_data(
         let credentials = read_credentials_secret(
             client,
             &sourced.credentials_namespace,
+            sourced.config_name.as_deref(),
+            &account.account_key,
             &account.credentials_secret_ref.name,
             &account.credentials_secret_ref.access_key_key,
             &account.credentials_secret_ref.secret_key_key,
@@ -70,19 +73,46 @@ struct Credentials {
 async fn read_credentials_secret(
     client: &kube::Client,
     namespace: &str,
+    config_name: Option<&str>,
+    account_key: &str,
     secret_name: &str,
     access_key_key: &str,
     secret_key_key: &str,
 ) -> Result<Credentials, Error> {
+    let account_ref = match config_name {
+        Some(config_name) => format!("{config_name}/{account_key}"),
+        None => account_key.to_owned(),
+    };
+    logging::info(&format!(
+        "reading credentials secret {namespace}/{secret_name} for account {account_ref}"
+    ));
+
     let api: Api<Secret> = Api::namespaced(client.clone(), namespace);
-    let secret = api.get(secret_name).await?;
+    let secret = match api.get(secret_name).await {
+        Ok(secret) => secret,
+        Err(kube::Error::Api(response)) if response.code == 404 => {
+            let message = format!(
+                "credentials secret {namespace}/{secret_name} not found for account {account_ref}; create the secret in namespace {namespace}"
+            );
+            logging::error(&message);
+            return Err(Error::UserInputError(message));
+        }
+        Err(source) => {
+            logging::error(&format!(
+                "failed to read credentials secret {namespace}/{secret_name} for account {account_ref}: {source}"
+            ));
+            return Err(Error::KubeError { source });
+        }
+    };
 
     let read_key = |key: &str| -> Result<String, Error> {
         if let Some(data) = secret.data.as_ref().and_then(|d| d.get(key)) {
             return String::from_utf8(data.0.clone()).map_err(|_| {
-                Error::UserInputError(format!(
-                    "secret {secret_name} key {key} is not valid UTF-8"
-                ))
+                let message = format!(
+                    "credentials secret {namespace}/{secret_name} key {key} is not valid UTF-8 for account {account_ref}"
+                );
+                logging::error(&message);
+                Error::UserInputError(message)
             });
         }
 
@@ -90,9 +120,11 @@ async fn read_credentials_secret(
             return Ok(string_data.clone());
         }
 
-        Err(Error::UserInputError(format!(
-            "secret {secret_name} missing key {key}"
-        )))
+        let message = format!(
+            "credentials secret {namespace}/{secret_name} missing key {key} for account {account_ref}"
+        );
+        logging::error(&message);
+        Err(Error::UserInputError(message))
     };
 
     Ok(Credentials {
