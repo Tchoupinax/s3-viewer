@@ -1,7 +1,7 @@
 operator:
   enabled: true
   namespace: s3-viewer-operator
-  createNamespace: true
+  createNamespace: false
   replicaCount: 1
 
   image:
@@ -24,7 +24,3 @@ operator:
     create: true
 
   defaultAppImage: ghcr.io/tchoupinax/s3-viewer:latest
-
-s3viewer:
-  enabled: false
-  instances: []
