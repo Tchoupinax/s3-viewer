@@ -1,6 +1,6 @@
 operator:
   enabled: true
-  namespace: s3-viewer-operator
+  namespace: s3-viewer
   createNamespace: false
   replicaCount: 1
 
