@@ -23,6 +23,12 @@ docker_build(
   ],
 )
 
+# CRDs must exist before dev S3Viewer / S3ViewerConfig manifests are applied.
+k8s_yaml([
+  'charts/s3-viewer/crds/s3viewers.s3viewer.dev.yaml',
+  'charts/s3-viewer/crds/s3viewerconfigs.s3viewer.dev.yaml',
+])
+
 helm_resource(
   's3-viewer-operator',
   'charts/s3-viewer',
@@ -32,7 +38,6 @@ helm_resource(
     ('operator.image.repository', 'operator.image.tag'),
     'operator.defaultAppImage',
   ],
-  resource_deps=['s3-viewer'],
   labels=['operator'],
 )
 
@@ -41,48 +46,73 @@ k8s_yaml('dev/minio.yaml')
 k8s_resource(
   'minio-backups',
   labels=['minio'],
-  resource_deps=['s3-viewer-operator'],
 )
 
 k8s_resource(
   'minio-logs',
   labels=['minio'],
-  resource_deps=['s3-viewer-operator'],
 )
 
 k8s_resource(
   'minio-archive',
   labels=['minio'],
-  resource_deps=['s3-viewer-operator'],
 )
 
 k8s_resource(
   'minio-media',
   labels=['minio'],
-  resource_deps=['s3-viewer-operator'],
+)
+
+k8s_yaml('dev/namespaces.yaml')
+
+k8s_resource(
+  objects=['aluminium:namespace', 'copper:namespace', 'iron:namespace'],
+  new_name='app-namespaces',
+)
+
+k8s_yaml('dev/secret.yaml')
+
+k8s_resource(
+  objects=[
+    'minio-backups-creds:secret:aluminium',
+    'minio-logs-creds:secret:aluminium',
+    'minio-archive-creds:secret:aluminium',
+    'minio-media-creds:secret:copper',
+    'minio-archive-creds:secret:iron',
+  ],
+  new_name='app-secrets',
+  resource_deps=['app-namespaces'],
 )
 
 k8s_yaml([
-  'dev/secret.yaml',
   'dev/aluminium.yaml',
   'dev/copper.yaml',
   'dev/iron.yaml',
 ])
 
 k8s_resource(
-  objects=['visionn32:s3viewer:aluminium'],
+  objects=[
+    'backups:s3viewer:aluminium',
+    'backups:s3viewerconfig:aluminium',
+  ],
   new_name='aluminium',
   labels=['app'],
   links=['http://aluminium.127.0.0.1.nip.io'],
-  resource_deps=['minio-backups', 'minio-logs', 'minio-archive', 's3-viewer'],
+  resource_deps=[
+    's3-viewer-operator',
+    'app-secrets',
+    'minio-backups',
+    'minio-logs',
+    'minio-archive',
+  ],
 )
 
 k8s_resource(
-  objects=['demo:s3viewer:copper', 'default:s3viewerconfig:copper'],
+  objects=['demo:s3viewer:copper', 'media:s3viewerconfig:copper'],
   new_name='copper',
   labels=['app'],
   links=['http://copper.127.0.0.1.nip.io'],
-  resource_deps=['minio-media', 's3-viewer'],
+  resource_deps=['s3-viewer-operator', 'app-secrets', 'minio-media'],
 )
 
 k8s_resource(
@@ -90,32 +120,12 @@ k8s_resource(
   new_name='iron',
   labels=['app'],
   links=['http://iron.127.0.0.1.nip.io'],
-  resource_deps=['minio-archive', 'minio-media', 'copper', 'aluminium', 's3-viewer'],
-)
-
-k8s_attach(
-  'aluminium-app',
-  'deployment/visionn32-s3-viewer',
-  namespace='aluminium',
-  port_forwards='3000:3000',
-  labels=['app'],
-  resource_deps=['aluminium'],
-)
-
-k8s_attach(
-  'copper-app',
-  'deployment/demo-s3-viewer',
-  namespace='copper',
-  port_forwards='3001:3000',
-  labels=['app'],
-  resource_deps=['copper'],
-)
-
-k8s_attach(
-  'iron-app',
-  'deployment/main-s3-viewer',
-  namespace='iron',
-  port_forwards='3002:3000',
-  labels=['app'],
-  resource_deps=['iron'],
+  resource_deps=[
+    's3-viewer-operator',
+    'app-secrets',
+    'minio-archive',
+    'minio-media',
+    'copper',
+    'aluminium',
+  ],
 )

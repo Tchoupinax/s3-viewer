@@ -29,8 +29,10 @@ metadata:
 spec:
   image: {{ (.image | default $.Values.operator.defaultAppImage) | quote }}
   replicas: {{ .replicas | default 1 }}
-  accounts:
-    {{- toYaml .accounts | nindent 4 }}
+  {{- with .configNamespaces }}
+  configNamespaces:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- with .service }}
   service:
     {{- toYaml . | nindent 4 }}

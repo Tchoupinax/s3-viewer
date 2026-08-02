@@ -57,9 +57,7 @@ Example spec fields:
 |-------|-------------|
 | `spec.image` | Container image (default `ghcr.io/tchoupinax/s3-viewer:latest`). |
 | `spec.replicas` | Deployment replicas (default `1`). |
-| `spec.accounts` | S3 accounts to expose in the viewer. |
-| `spec.accounts[].accountKey` | Env prefix (`BACKUPS` → `S3_VIEWER_ACCOUNT_BACKUPS_*`). |
-| `spec.accounts[].credentialsSecretRef` | Secret with access/secret keys. |
+| `spec.configNamespaces` | Namespaces to scan for `S3ViewerConfig` accounts. |
 | `spec.service.port` | Service port (default `3000`). |
 | `spec.ingress.host` | Optional ingress hostname. |
 

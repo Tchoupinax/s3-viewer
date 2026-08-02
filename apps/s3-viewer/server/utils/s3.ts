@@ -1,14 +1,7 @@
 import { S3Client } from "@aws-sdk/client-s3";
-import { existsSync, watch } from "node:fs";
-import { clearTimeout, setInterval, setTimeout } from "node:timers";
 
 import type { Account } from "~/server/types/account";
-import {
-  ACCOUNT_ENV_PREFIX,
-  fingerprintAccountEnv,
-  loadS3ViewerAccountEnv,
-  S3_VIEWER_ACCOUNTS_DIR,
-} from "~/server/utils/s3-env";
+import { ACCOUNT_ENV_PREFIX, loadS3ViewerAccountEnv } from "~/server/utils/s3-env";
 
 const REQUIRED_FIELDS = [
   "ACCESS_KEY",
@@ -40,8 +33,6 @@ type RawAccount = {
 };
 
 let currentConnections: Array<Account> = [];
-let currentFingerprint = "";
-let reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
 function parseReadOnly(value: string | undefined): boolean {
   if (!value) {
@@ -117,62 +108,15 @@ function buildAccountsFromEnv(env: Record<string, string>): Array<Account> {
   }));
 }
 
-function reloadConnections(): void {
+export function initS3Accounts(): void {
   const env = loadS3ViewerAccountEnv();
-  const fingerprint = fingerprintAccountEnv(env);
-
-  if (fingerprint === currentFingerprint) {
-    return;
-  }
-
-  const nextConnections = buildAccountsFromEnv(env);
-  currentFingerprint = fingerprint;
-  currentConnections = nextConnections;
+  currentConnections = buildAccountsFromEnv(env);
 
   console.log(
-    `[s3-viewer] loaded ${nextConnections.length} S3 account(s) from ${
-      existsSync(S3_VIEWER_ACCOUNTS_DIR)
-        ? S3_VIEWER_ACCOUNTS_DIR
-        : "process.env"
-    }`,
+    `[s3-viewer] loaded ${currentConnections.length} S3 account(s) at startup`,
   );
-}
-
-function scheduleReload(): void {
-  if (reloadTimer) {
-    clearTimeout(reloadTimer);
-  }
-
-  reloadTimer = setTimeout(() => {
-    reloadTimer = null;
-
-    try {
-      reloadConnections();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[s3-viewer] failed to reload S3 accounts: ${message}`);
-    }
-  }, 250);
 }
 
 export function getConnections(): Array<Account> {
   return currentConnections;
-}
-
-export function initS3AccountHotReload(): void {
-  reloadConnections();
-
-  if (!existsSync(S3_VIEWER_ACCOUNTS_DIR)) {
-    console.log(
-      "[s3-viewer] account hot reload disabled (set S3_VIEWER_ACCOUNTS_DIR or mount secret volume)",
-    );
-    return;
-  }
-
-  watch(S3_VIEWER_ACCOUNTS_DIR, { persistent: true }, () => scheduleReload());
-  setInterval(() => scheduleReload(), 5_000);
-
-  console.log(
-    `[s3-viewer] account hot reload enabled for ${S3_VIEWER_ACCOUNTS_DIR}`,
-  );
 }

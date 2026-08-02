@@ -11,7 +11,7 @@ use k8s_openapi::api::networking::v1::{
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta, OwnerReference};
 use k8s_openapi::ByteString;
-use kube::api::{Patch, PatchParams, PostParams};
+use kube::api::{ListParams, Patch, PatchParams, PostParams};
 use kube::{Api, Client, Resource, ResourceExt};
 
 use crate::crd::{IngressSpec as ViewerIngressSpec, S3Viewer, ServiceSpec as ViewerServiceSpec};
@@ -141,7 +141,7 @@ fn secret_data_digest(data: &BTreeMap<String, ByteString>) -> String {
     parts.join("|")
 }
 
-pub fn build_secret(viewer: &S3Viewer, data: BTreeMap<String, ByteString>) -> Secret {
+pub fn build_account_secret(viewer: &S3Viewer, data: BTreeMap<String, ByteString>) -> Secret {
     Secret {
         metadata: object_meta(viewer, &resource_base_name(viewer)),
         type_: Some("Opaque".to_owned()),
@@ -151,10 +151,52 @@ pub fn build_secret(viewer: &S3Viewer, data: BTreeMap<String, ByteString>) -> Se
     }
 }
 
+fn build_accounts_volume(secret_name: &str) -> Volume {
+    Volume {
+        name: ACCOUNTS_VOLUME_NAME.to_owned(),
+        secret: Some(SecretVolumeSource {
+            secret_name: Some(secret_name.to_owned()),
+            optional: Some(true),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn build_container_env(service_port: i32, mount_accounts: bool) -> Vec<EnvVar> {
+    let mut env = vec![
+        EnvVar {
+            name: "HOST".to_owned(),
+            value: Some("0.0.0.0".to_owned()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "PORT".to_owned(),
+            value: Some(service_port.to_string()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "NODE_ENV".to_owned(),
+            value: Some("production".to_owned()),
+            ..Default::default()
+        },
+    ];
+
+    if mount_accounts {
+        env.push(EnvVar {
+            name: "S3_VIEWER_ACCOUNTS_DIR".to_owned(),
+            value: Some(ACCOUNTS_MOUNT_PATH.to_owned()),
+            ..Default::default()
+        });
+    }
+
+    env
+}
+
 pub fn build_deployment(
     viewer: &S3Viewer,
     effective: &EffectiveSpec,
-    secret_name: &str,
+    accounts_secret_name: Option<&str>,
     secret_data: &BTreeMap<String, ByteString>,
 ) -> Deployment {
     let service = service_spec(effective);
@@ -162,6 +204,23 @@ pub fn build_deployment(
     let selector_labels = labels(viewer);
     let mut metadata = object_meta(viewer, &resource_base_name(viewer));
     metadata.annotations = Some(viewer_annotations(viewer, effective));
+
+    let accounts_volume_mount = VolumeMount {
+        name: ACCOUNTS_VOLUME_NAME.to_owned(),
+        mount_path: ACCOUNTS_MOUNT_PATH.to_owned(),
+        read_only: Some(true),
+        ..Default::default()
+    };
+
+    let mount_accounts = accounts_secret_name.is_some();
+    let (volumes, volume_mounts) = if let Some(secret_name) = accounts_secret_name {
+        (
+            Some(vec![build_accounts_volume(secret_name)]),
+            Some(vec![accounts_volume_mount]),
+        )
+    } else {
+        (None, None)
+    };
 
     Deployment {
         metadata,
@@ -185,45 +244,11 @@ pub fn build_deployment(
                             container_port: service.port,
                             ..Default::default()
                         }]),
-                        env: Some(vec![
-                            EnvVar {
-                                name: "HOST".to_owned(),
-                                value: Some("0.0.0.0".to_owned()),
-                                ..Default::default()
-                            },
-                            EnvVar {
-                                name: "PORT".to_owned(),
-                                value: Some(service.port.to_string()),
-                                ..Default::default()
-                            },
-                            EnvVar {
-                                name: "NODE_ENV".to_owned(),
-                                value: Some("production".to_owned()),
-                                ..Default::default()
-                            },
-                            EnvVar {
-                                name: "S3_VIEWER_ACCOUNTS_DIR".to_owned(),
-                                value: Some(ACCOUNTS_MOUNT_PATH.to_owned()),
-                                ..Default::default()
-                            },
-                        ]),
-                        volume_mounts: Some(vec![VolumeMount {
-                            name: ACCOUNTS_VOLUME_NAME.to_owned(),
-                            mount_path: ACCOUNTS_MOUNT_PATH.to_owned(),
-                            read_only: Some(true),
-                            ..Default::default()
-                        }]),
+                        env: Some(build_container_env(service.port, mount_accounts)),
+                        volume_mounts,
                         ..Default::default()
                     }],
-                    volumes: Some(vec![Volume {
-                        name: ACCOUNTS_VOLUME_NAME.to_owned(),
-                        secret: Some(SecretVolumeSource {
-                            secret_name: Some(secret_name.to_owned()),
-                            optional: None,
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    }]),
+                    volumes,
                     ..Default::default()
                 }),
             },
@@ -313,10 +338,10 @@ pub async fn deploy_s3viewer(
     namespace: &str,
     viewer: &S3Viewer,
     effective: &EffectiveSpec,
-    secret_name: &str,
+    accounts_secret_name: Option<&str>,
     secret_data: &BTreeMap<String, ByteString>,
 ) -> Result<(), Error> {
-    let deployment = build_deployment(viewer, effective, secret_name, secret_data);
+    let deployment = build_deployment(viewer, effective, accounts_secret_name, secret_data);
     let service = build_service(viewer, effective);
 
     ensure_deployment(client, namespace, &deployment).await?;
@@ -363,11 +388,11 @@ pub async fn ensure_secret(client: &Client, namespace: &str, secret: &Secret) ->
         .ok_or_else(|| Error::UserInputError("secret name is required".to_owned()))?;
     let key_count = secret.data.as_ref().map(|data| data.len()).unwrap_or(0);
     let api: Api<Secret> = Api::namespaced(client.clone(), namespace);
-    let patch_params = PatchParams::apply("s3-viewer-operator").force();
     match api.get(&name).await {
-        Ok(_) => {
-            api.patch(&name, &patch_params, &Patch::Apply(secret))
-                .await?;
+        Ok(existing) => {
+            let mut replacement = secret.clone();
+            replacement.metadata.resource_version = existing.metadata.resource_version;
+            api.replace(&name, &PostParams::default(), &replacement).await?;
         }
         Err(kube::Error::Api(response)) if response.code == 404 => {
             api.create(&PostParams::default(), secret).await?;
@@ -376,6 +401,46 @@ pub async fn ensure_secret(client: &Client, namespace: &str, secret: &Secret) ->
     }
 
     Ok(key_count)
+}
+
+pub async fn cleanup_legacy_per_config_account_secrets(
+    client: &Client,
+    viewer_namespace: &str,
+    viewer: &S3Viewer,
+) -> Result<(), Error> {
+    let api: Api<Secret> = Api::namespaced(client.clone(), viewer_namespace);
+    let label_selector = format!(
+        "app.kubernetes.io/managed-by={},app.kubernetes.io/instance={}",
+        MANAGED_BY,
+        viewer.name_any()
+    );
+    let list = api
+        .list(&ListParams::default().labels(&label_selector))
+        .await?;
+    let active_name = resource_base_name(viewer);
+    let legacy_prefix = format!("{}-", active_name);
+
+    for secret in list.items {
+        let name = secret.name_any();
+        if name != active_name && name.starts_with(&legacy_prefix) && name.ends_with("-accounts") {
+            delete_secret_if_present(client, viewer_namespace, &name).await?;
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn delete_secret_if_present(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+) -> Result<(), Error> {
+    let api: Api<Secret> = Api::namespaced(client.clone(), namespace);
+    match api.delete(name, &Default::default()).await {
+        Ok(_) => Ok(()),
+        Err(kube::Error::Api(response)) if response.code == 404 => Ok(()),
+        Err(source) => Err(Error::KubeError { source }),
+    }
 }
 
 pub async fn ensure_deployment(

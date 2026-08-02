@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aluminium
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: copper
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iron

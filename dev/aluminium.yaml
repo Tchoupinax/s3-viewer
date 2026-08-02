@@ -1,62 +1,19 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: aluminium
-
----
 apiVersion: s3viewer.dev/v1
 kind: S3ViewerConfig
 metadata:
   name: backups
   namespace: aluminium
+
 spec:
   accounts:
-    - accountKey: BACKUPS
+    - accountKey: ALUMINIUM
       id: minio-backups
-      name: Backups
+      name: aluminium
       endpoint: http://minio-backups.minio.svc.cluster.local:9000
       region: us-east-1
       readOnly: false
       credentialsSecretRef:
         name: minio-backups-creds
-        accessKeyKey: access-key
-        secretKeyKey: secret-key
-
----
-apiVersion: s3viewer.dev/v1
-kind: S3ViewerConfig
-metadata:
-  name: logs
-  namespace: aluminium
-spec:
-  accounts:
-    - accountKey: LOGS
-      id: minio-logs
-      name: Logs
-      endpoint: http://minio-logs.minio.svc.cluster.local:9000
-      region: us-east-1
-      readOnly: false
-      credentialsSecretRef:
-        name: minio-logs-creds
-        accessKeyKey: access-key
-        secretKeyKey: secret-key
-
----
-apiVersion: s3viewer.dev/v1
-kind: S3ViewerConfig
-metadata:
-  name: archive
-  namespace: aluminium
-spec:
-  accounts:
-    - accountKey: ARCHIVE
-      id: minio-archive
-      name: Archive
-      endpoint: http://minio-archive.minio.svc.cluster.local:9000
-      region: us-east-1
-      readOnly: true
-      credentialsSecretRef:
-        name: minio-archive-creds
         accessKeyKey: access-key
         secretKeyKey: secret-key
 
@@ -64,41 +21,11 @@ spec:
 apiVersion: s3viewer.dev/v1
 kind: S3Viewer
 metadata:
-  name: visionn32
+  name: backups
   namespace: aluminium
+
 spec:
   replicas: 1
-  accounts:
-    - accountKey: BACKUPS2
-      id: minio-backups
-      name: Backups
-      endpoint: http://minio-backups.minio.svc.cluster.local:9000
-      region: us-east-1
-      readOnly: false
-      credentialsSecretRef:
-        name: minio-backups-creds
-        accessKeyKey: access-key
-        secretKeyKey: secret-key
-    - accountKey: LOGS2
-      id: minio-logs
-      name: Logs
-      endpoint: http://minio-logs.minio.svc.cluster.local:9000
-      region: us-east-1
-      readOnly: false
-      credentialsSecretRef:
-        name: minio-logs-creds
-        accessKeyKey: access-key
-        secretKeyKey: secret-key
-    - accountKey: ARCHIVE2
-      id: minio-archive
-      name: Archive
-      endpoint: http://minio-archive.minio.svc.cluster.local:9000
-      region: us-east-1
-      readOnly: true
-      credentialsSecretRef:
-        name: minio-archive-creds
-        accessKeyKey: access-key
-        secretKeyKey: secret-key
   service:
     port: 3000
     type: ClusterIP

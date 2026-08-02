@@ -23,8 +23,6 @@ pub struct S3ViewerSpec {
     #[serde(default = "default_replicas")]
     pub replicas: i32,
     #[serde(default)]
-    pub accounts: Vec<S3AccountSpec>,
-    #[serde(default)]
     pub service: Option<ServiceSpec>,
     #[serde(default)]
     pub ingress: Option<IngressSpec>,

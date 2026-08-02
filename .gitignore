@@ -29,3 +29,4 @@ dev/secret.yaml
 
 apps/s3-viewer-operator/target
 .turbo
+test.yaml

@@ -26,18 +26,7 @@ pub async fn resolve_effective_spec(
     viewer: &S3Viewer,
 ) -> Result<EffectiveSpec, Error> {
     let config_accounts = list_config_accounts(client, viewer, namespace).await?;
-    let inline_accounts = viewer
-        .spec
-        .accounts
-        .iter()
-        .map(|account| SourcedAccount {
-            account: account.clone(),
-            credentials_namespace: namespace.to_owned(),
-            config_name: None,
-        })
-        .collect::<Vec<_>>();
-
-    let accounts = dedupe_account_keys(config_accounts.into_iter().chain(inline_accounts))?;
+    let accounts = dedupe_account_keys(config_accounts)?;
 
     Ok(EffectiveSpec {
         image: viewer.spec.image.clone(),

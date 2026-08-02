@@ -15,7 +15,7 @@ COPY apps/s3-viewer apps/s3-viewer
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @s3-viewer/app build
 
-FROM gcr.io/distroless/nodejs26-debian13:nonroot
+FROM node:26-alpine
 
 WORKDIR /app
 
