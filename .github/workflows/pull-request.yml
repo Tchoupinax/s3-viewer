@@ -5,9 +5,38 @@ on:
 
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      operator: ${{ steps.filter.outputs.operator }}
+      helm: ${{ steps.filter.outputs.helm }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - name: Detect changed paths
+      uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          app:
+            - 'apps/s3-viewer/**'
+            - 'pnpm-lock.yaml'
+            - 'pnpm-workspace.yaml'
+          operator:
+            - 'apps/s3-viewer-operator/**'
+          helm:
+            - 'charts/s3-viewer/**'
+
   lint:
     name: Check application code quality 🫆
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     steps:
     - name: Check application code quality 🫆
       uses: tchoupinax/repo-config/shared-actions/steps/node/lint@master
@@ -18,6 +47,8 @@ jobs:
   lint-operator:
     name: Check operator code quality 🫆
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.operator == 'true'
     steps:
     - name: Check operator code quality 🫆
       uses: tchoupinax/repo-config/shared-actions/steps/rust/lint@master
@@ -27,7 +58,10 @@ jobs:
   build:
     name: Check application build success 🦫
     runs-on: ubuntu-latest
-    needs: lint
+    needs: [changes, lint]
+    if: |
+      needs.changes.outputs.app == 'true' &&
+      needs.lint.result == 'success'
     steps:
     - name: Check application build success 🦫
       uses: tchoupinax/repo-config/shared-actions/steps/node/build@master
@@ -38,7 +72,10 @@ jobs:
   build-operator:
     name: Check operator build success 🦫
     runs-on: ubuntu-latest
-    needs: lint-operator
+    needs: [changes, lint-operator]
+    if: |
+      needs.changes.outputs.operator == 'true' &&
+      needs.lint-operator.result == 'success'
     steps:
     - name: Check operator build success 🦫
       uses: tchoupinax/repo-config/shared-actions/steps/rust/build@master
@@ -48,6 +85,8 @@ jobs:
   build-application-docker:
     name: Build container for application 🐳
     runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     permissions:
       packages: write
 
@@ -107,6 +146,8 @@ jobs:
   build-operator-docker:
     name: Build container for operator 🐳
     runs-on: ubuntu-24.04
+    needs: changes
+    if: needs.changes.outputs.operator == 'true'
     permissions:
       packages: write
 
@@ -160,6 +201,8 @@ jobs:
   publish-helm-chart:
     name: Publish Helm chart (OCI) 📦
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.helm == 'true'
     permissions:
       contents: read
       packages: write

@@ -6,6 +6,29 @@ on:
     - master
 
 jobs:
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - name: Detect changed paths
+      uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          app:
+            - 'apps/s3-viewer/**'
+            - 'package.json'
+            - 'pnpm-lock.yaml'
+            - 'pnpm-workspace.yaml'
+            - 'turbo.json'
+
   build:
     name: Run release draft to extract labels ☕️
     runs-on: ubuntu-latest
@@ -19,6 +42,8 @@ jobs:
   docker:
     name: Build intermediate container 🐳
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
     permissions:
       packages: write
     steps:
