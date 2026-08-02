@@ -1,0 +1,18 @@
+{{- if and .Values.operator.enabled .Values.operator.serviceMonitor.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "s3-viewer.operator.name" . }}
+  namespace: {{ .Values.operator.namespace }}
+  labels:
+    {{- include "s3-viewer.operator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "s3-viewer.operator.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: metrics
+      port: {{ .Values.operator.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+{{- end }}

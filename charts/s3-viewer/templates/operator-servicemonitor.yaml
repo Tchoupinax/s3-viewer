@@ -1,0 +1,36 @@
+{{- if and .Values.operator.enabled .Values.operator.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "s3-viewer.operator.name" . }}
+  namespace: {{ .Values.operator.namespace }}
+  labels:
+    {{- include "s3-viewer.operator.labels" . | nindent 4 }}
+    {{- with .Values.operator.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.operator.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "s3-viewer.operator.selectorLabels" . | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Values.operator.namespace }}
+  endpoints:
+    - port: metrics
+      path: {{ .Values.operator.serviceMonitor.path }}
+      interval: {{ .Values.operator.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.operator.serviceMonitor.scrapeTimeout }}
+      {{- with .Values.operator.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operator.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

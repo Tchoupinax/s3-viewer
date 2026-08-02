@@ -24,3 +24,16 @@ operator:
     create: true
 
   defaultAppImage: ghcr.io/tchoupinax/s3-viewer:latest
+
+  metrics:
+    port: 8080
+
+  serviceMonitor:
+    enabled: false
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    annotations: {}
+    relabelings: []
+    metricRelabelings: []

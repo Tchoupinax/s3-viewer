@@ -21,6 +21,12 @@ spec:
         - name: operator
           image: {{ include "s3-viewer.operator.image" . }}
           imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+          {{- if .Values.operator.serviceMonitor.enabled }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.operator.metrics.port }}
+              protocol: TCP
+          {{- end }}
           env:
             - name: S3_VIEWER_DEFAULT_IMAGE
               value: {{ .Values.operator.defaultAppImage | quote }}
