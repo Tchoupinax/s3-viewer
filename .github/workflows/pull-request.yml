@@ -58,7 +58,7 @@ jobs:
         flavor: latest=true
         tags: |
           type=raw,value=latest-${{ steps.date.outputs.date }}
-          type=raw,value=latest-${{ gitea.sha }}
+          type=raw,value=latest-${{ github.sha }}
           type=raw,value=latest
 
     - name: Build and push image
