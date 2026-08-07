@@ -25,6 +25,8 @@ operator:
 
   defaultAppImage: ghcr.io/tchoupinax/s3-viewer:latest
 
+  logLevel: info
+
   metrics:
     port: 8080
 

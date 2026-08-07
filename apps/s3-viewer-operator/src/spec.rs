@@ -67,7 +67,7 @@ pub async fn list_resolved_configs(
     if watches_all_config_namespaces(viewer) {
         let api: Api<S3ViewerConfig> = Api::all(client.clone());
         let list = api.list(&Default::default()).await?;
-        logging::info(&format!(
+        logging::debug(&format!(
             "wildcard configNamespaces: found {} S3ViewerConfig(s) cluster-wide",
             list.items.len()
         ));
@@ -75,7 +75,7 @@ pub async fn list_resolved_configs(
             let namespace = config.namespace().unwrap_or_default();
             let config_name = config.name_any();
             let account_count = config.spec.accounts.len();
-            logging::info(&format!(
+            logging::debug(&format!(
                 "wildcard configNamespaces: including {namespace}/{config_name} ({account_count} account(s))"
             ));
             configs.push(ResolvedConfig {

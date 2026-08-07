@@ -20,6 +20,7 @@ use s3_viewer_operator::spec::{
     describe_sourced_accounts, resolve_effective_spec, watched_config_namespaces,
 };
 use s3_viewer_operator::logging;
+use s3_viewer_operator::metrics::{self, OperatorMetrics};
 use s3_viewer_operator::viewer_index::{register_viewer, unregister_viewer, ViewerIndex};
 use s3_viewer_operator::Error;
 use tokio::time::Duration;
@@ -39,16 +40,30 @@ async fn main() {
     let kubernetes_client = Client::try_from(kube_config)
         .expect("Failed to create Kubernetes client.");
 
+    let metrics = OperatorMetrics::new().expect("failed to initialize Prometheus metrics");
+
+    if metrics::metrics_enabled() {
+        let metrics_server = metrics.clone();
+        let metrics_addr = metrics::metrics_bind_addr();
+        tokio::spawn(async move {
+            metrics::serve(metrics_server, metrics_addr).await;
+        });
+    } else {
+        logging::info("metrics server disabled (METRICS_ENABLED=false)");
+    }
+
     let viewer_api: Api<S3Viewer> = Api::all(kubernetes_client.clone());
     let config_api: Api<S3ViewerConfig> = Api::all(kubernetes_client.clone());
     let context = Arc::new(ContextData {
         client: kubernetes_client,
         cluster_url: cluster_url.clone(),
         viewer_index: ViewerIndex::new(),
+        metrics,
     });
 
     logging::info(&format!(
-        "s3-viewer-operator started (Kubernetes API: {cluster_url})"
+        "s3-viewer-operator started (Kubernetes API: {cluster_url}, log level: {})",
+        std::env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_owned())
     ));
 
     let watch_config = WatchConfig::default().timeout(280);
@@ -77,12 +92,12 @@ async fn main() {
         .await;
 }
 
-fn log_info(message: &str) {
-    logging::info(message);
-}
-
-fn log_error(message: &str) {
-    logging::error(message);
+fn log_reconcile_error(namespace: &str, name: &str, error: &Error) {
+    logging::error(&format!(
+        "reconcile failed for s3viewer {}: {}",
+        format_reconcile_target(namespace, name),
+        error
+    ));
 }
 
 async fn handle_reconcile_error(
@@ -93,7 +108,7 @@ async fn handle_reconcile_error(
 ) {
     log_reconcile_error(namespace, name, error);
     if let Err(status_err) = publish_error_status(client, name, namespace, error).await {
-        log_error(&format!(
+        logging::error(&format!(
             "failed to write error status for {}: {}",
             format_reconcile_target(namespace, name),
             status_err
@@ -103,14 +118,6 @@ async fn handle_reconcile_error(
 
 fn format_reconcile_target(namespace: &str, name: &str) -> String {
     format!("{namespace}/{name}")
-}
-
-fn log_reconcile_error(namespace: &str, name: &str, error: &Error) {
-    log_error(&format!(
-        "reconcile failed for s3viewer {}: {}",
-        format_reconcile_target(namespace, name),
-        error
-    ));
 }
 
 async fn publish_error_status(
@@ -142,17 +149,17 @@ fn log_controller_error(
 ) {
     match err {
         ControllerError::QueueError(source) => {
-            log_error(&format!("controller queue error ({cluster_url}): {source:?}"));
+            logging::error(&format!("controller queue error ({cluster_url}): {source:?}"));
         }
         ControllerError::ObjectNotFound(_) => {}
         ControllerError::ReconcilerFailed(source, object) if error_is_object_gone(source) => {}
         ControllerError::ReconcilerFailed(source, object) => {
-            log_error(&format!(
+            logging::error(&format!(
                 "reconciliation error for {object:?} ({cluster_url}): {source}"
             ));
         }
         other => {
-            log_error(&format!("controller error ({cluster_url}): {other:?}"));
+            logging::error(&format!("controller error ({cluster_url}): {other:?}"));
         }
     }
 }
@@ -161,6 +168,7 @@ struct ContextData {
     client: Client,
     cluster_url: String,
     viewer_index: ViewerIndex,
+    metrics: Arc<OperatorMetrics>,
 }
 
 enum ViewerAction {
@@ -170,6 +178,22 @@ enum ViewerAction {
 }
 
 async fn reconcile(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<Action, Error> {
+    let started = std::time::Instant::now();
+    let result = reconcile_viewer(viewer, context.clone()).await;
+    let duration = started.elapsed().as_secs_f64();
+
+    context.metrics.record_reconcile(
+        if result.is_ok() { "success" } else { "error" },
+        duration,
+    );
+    context
+        .metrics
+        .set_viewers_managed(context.viewer_index.viewer_count() as i64);
+
+    result
+}
+
+async fn reconcile_viewer(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<Action, Error> {
     let namespace = viewer.namespace().ok_or_else(|| {
         Error::UserInputError("Expected S3Viewer resource to be namespaced.".to_owned())
     })?;
@@ -206,7 +230,7 @@ async fn reconcile_action(
 
     match determine_action(&viewer) {
         ViewerAction::Register => {
-            log_info(&format!(
+            logging::info(&format!(
                 "s3viewer created: {namespace}/{name} (generation {})",
                 viewer.meta().generation.unwrap_or(0)
             ));
@@ -215,7 +239,7 @@ async fn reconcile_action(
             Ok(Action::requeue(Duration::from_secs(30)))
         }
         ViewerAction::Unregister => {
-            log_info(&format!("s3viewer deleted: {namespace}/{name}"));
+            logging::info(&format!("s3viewer deleted: {namespace}/{name}"));
             unregister_viewer(&context.viewer_index, ObjectRef::from(&*viewer));
             s3_viewer_operator::resources::delete_ingress_if_present(
                 &context.client,
@@ -231,7 +255,7 @@ async fn reconcile_action(
             Ok(Action::await_change())
         }
         ViewerAction::NoOp => {
-            log_info(&format!(
+            logging::info(&format!(
                 "s3viewer updated: {namespace}/{name} (generation {}, configNamespaces: {:?})",
                 viewer.meta().generation.unwrap_or(0),
                 viewer.spec.config_namespaces
@@ -256,7 +280,7 @@ async fn provision_s3viewer(
     viewer: &S3Viewer,
 ) -> Result<(), Error> {
     let config_namespaces = watched_config_namespaces(viewer, namespace);
-    log_info(&format!(
+    logging::debug(&format!(
         "provisioning {}: scanning configNamespaces [{}]",
         format_reconcile_target(namespace, &viewer.name_any()),
         config_namespaces.join(",")
@@ -264,7 +288,7 @@ async fn provision_s3viewer(
 
     let effective = resolve_effective_spec(&context.client, namespace, viewer).await?;
 
-    log_info(&format!(
+    logging::debug(&format!(
         "resolved {} account(s) for {}: {}",
         effective.accounts.len(),
         format_reconcile_target(namespace, &viewer.name_any()),
@@ -272,7 +296,7 @@ async fn provision_s3viewer(
     ));
 
     let (secret_data, mount_secret_names) = if effective.accounts.is_empty() {
-        log_info(&format!(
+        logging::debug(&format!(
             "no S3ViewerConfig accounts for {} in configNamespaces [{}]; deploying without accounts",
             format_reconcile_target(namespace, &viewer.name_any()),
             config_namespaces.join(",")
@@ -281,7 +305,7 @@ async fn provision_s3viewer(
         cleanup_viewer_account_mount_secrets(&context.client, namespace, viewer, &[]).await?;
         (std::collections::BTreeMap::new(), Vec::new())
     } else {
-        log_info(&format!(
+        logging::debug(&format!(
             "loading account credentials for {}",
             format_reconcile_target(namespace, &viewer.name_any())
         ));
@@ -293,7 +317,7 @@ async fn provision_s3viewer(
     };
 
     let deployment_name = resource_base_name(viewer);
-    log_info(&format!(
+    logging::debug(&format!(
         "deploying workload {namespace}/{deployment_name} (replicas: {}, ingress: {})",
         viewer.spec.replicas,
         effective
@@ -313,7 +337,7 @@ async fn provision_s3viewer(
     )
     .await?;
 
-    log_info(&format!(
+    logging::debug(&format!(
         "workload {namespace}/{deployment_name} applied successfully"
     ));
 
@@ -404,7 +428,7 @@ fn on_error(viewer: Arc<S3Viewer>, error: &Error, context: Arc<ContextData>) -> 
         .namespace()
         .unwrap_or_else(|| "unknown".to_owned());
     let name = viewer.name_any();
-    log_error(&format!(
+    logging::warn(&format!(
         "reconcile retry scheduled for s3viewer {} (Kubernetes API: {}): {}",
         format_reconcile_target(&namespace, &name),
         context.cluster_url,
