@@ -21,15 +21,17 @@ spec:
         - name: operator
           image: {{ include "s3-viewer.operator.image" . }}
           imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
-          {{- if .Values.operator.serviceMonitor.enabled }}
           ports:
             - name: metrics
               containerPort: {{ .Values.operator.metrics.port }}
               protocol: TCP
-          {{- end }}
           env:
             - name: S3_VIEWER_DEFAULT_IMAGE
               value: {{ .Values.operator.defaultAppImage | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.operator.logLevel | quote }}
+            - name: METRICS_BIND
+              value: {{ printf "0.0.0.0:%v" .Values.operator.metrics.port | quote }}
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}
 {{- end }}

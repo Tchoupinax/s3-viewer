@@ -88,6 +88,51 @@ The operator writes back:
 - `status.message` — human-readable result
 - `status.url` — in-cluster service URL or ingress URL
 
+## Metrics (Victoria Metrics / Prometheus)
+
+The operator exposes **Prometheus text exposition format** at `GET /metrics` (default bind: `0.0.0.0:8080`). Victoria Metrics and vmagent scrape this format natively.
+
+Metrics:
+
+- `s3_viewer_operator_reconcile_total{result="success|error"}`
+- `s3_viewer_operator_reconcile_duration_seconds{result="success|error"}`
+- `s3_viewer_operator_viewers_managed`
+
+Environment variables:
+
+- `METRICS_BIND` — listen address (default `0.0.0.0:8080`)
+- `METRICS_ENABLED` — set to `false` to disable the metrics server
+
+Helm: enable scraping with:
+
+```yaml
+operator:
+  serviceMonitor:
+    enabled: true
+```
+
+Plain stdout logs remain human-readable text; use `/metrics` for time-series, not logs.
+
+## Logging
+
+Logs are written to stdout/stderr with RFC3339 timestamps and levels:
+
+```text
+[2026-08-07T06:53:40.251947995+00:00] INFO s3-viewer-operator started (Kubernetes API: ...)
+[2026-08-07T06:53:40.251947995+00:00] DEBUG deploying workload s3-viewer/main-s3-viewer (replicas: 1, ingress: ...)
+```
+
+Set `LOG_LEVEL` to control verbosity (`error`, `warn`, `info`, `debug`, `trace`). Default: `info`.
+
+At `info`, you see lifecycle events (created/updated/deleted). Reconcile details (provisioning, secrets, workload apply) are `debug`.
+
+Helm:
+
+```yaml
+operator:
+  logLevel: debug
+```
+
 ## Delete an instance
 
 ```bash

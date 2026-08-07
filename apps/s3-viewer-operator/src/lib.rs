@@ -1,6 +1,7 @@
 pub mod crd;
 pub mod finalizer;
 pub mod logging;
+pub mod metrics;
 pub mod resources;
 pub mod secrets;
 pub mod spec;

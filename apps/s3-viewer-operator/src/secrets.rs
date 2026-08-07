@@ -83,7 +83,7 @@ async fn read_credentials_secret(
         Some(config_name) => format!("{config_name}/{account_key}"),
         None => account_key.to_owned(),
     };
-    logging::info(&format!(
+    logging::debug(&format!(
         "reading credentials secret {namespace}/{secret_name} for account {account_ref}"
     ));
 

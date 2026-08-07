@@ -259,7 +259,7 @@ pub async fn sync_config_account_secrets(
 
         let config_secret = build_config_account_secret(config, secret_data.clone());
         ensure_secret(client, &config.namespace, &config_secret).await?;
-        crate::logging::info(&format!(
+        crate::logging::debug(&format!(
             "secret {}/{} updated ({} env keys, owner: S3ViewerConfig/{})",
             config.namespace,
             config_account_secret_name(&config.config),
@@ -278,7 +278,7 @@ pub async fn sync_config_account_secrets(
                 .clone()
                 .unwrap_or_default();
             ensure_secret(client, viewer_namespace, &mount_secret).await?;
-            crate::logging::info(&format!(
+            crate::logging::debug(&format!(
                 "secret {viewer_namespace}/{mount_name} updated ({} env keys, mount replica for S3ViewerConfig {}/{})",
                 key_count,
                 config.namespace,

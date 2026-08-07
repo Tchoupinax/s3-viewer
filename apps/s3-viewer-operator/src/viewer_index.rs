@@ -17,6 +17,19 @@ impl ViewerIndex {
         Self::default()
     }
 
+    pub fn viewer_count(&self) -> usize {
+        let Ok(map) = self.by_namespace.read() else {
+            return 0;
+        };
+
+        let mut unique = HashSet::new();
+        for set in map.values() {
+            unique.extend(set.iter().cloned());
+        }
+
+        unique.len()
+    }
+
     pub fn viewers_for_namespace(&self, namespace: &str) -> Vec<ObjectRef<S3Viewer>> {
         let Ok(map) = self.by_namespace.read() else {
             return Vec::new();
