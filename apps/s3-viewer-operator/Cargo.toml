@@ -17,7 +17,7 @@ path = "src/bin/crd-gen.rs"
 
 [dependencies]
 tokio = { version = "1.45", features = ["macros", "rt-multi-thread", "net", "io-util"] }
-kube = { version = "1.0.0", default-features = false, features = ["client", "derive", "runtime", "rustls-tls"] }
+kube = { version = "4.0.0", default-features = false, features = ["client", "derive", "runtime", "rustls-tls"] }
 k8s-openapi = { version = "0.25.0", default-features = false, features = ["v1_33"] }
 futures = "0.3"
 serde = { version = "1", features = ["derive"] }
