@@ -152,10 +152,17 @@ pub fn config_account_secret_name(config: &S3ViewerConfig) -> String {
     format!("{}-accounts", config.name_any())
 }
 
-fn viewer_mount_secret_name(viewer: &S3Viewer, config: &ResolvedConfig) -> String {
+pub fn resolve_viewer_mount_secret_name(
+    config: &ResolvedConfig,
+    used_names: &std::collections::HashSet<String>,
+) -> String {
+    let preferred = config_account_secret_name(&config.config);
+    if !used_names.contains(&preferred) {
+        return preferred;
+    }
+
     format!(
-        "{}-{}-{}-accounts",
-        resource_base_name(viewer),
+        "{}-{}-accounts",
         config.namespace,
         config.config.name_any()
     )
@@ -222,11 +229,12 @@ fn build_viewer_mount_secret(
     viewer: &S3Viewer,
     viewer_namespace: &str,
     config: &ResolvedConfig,
+    name: &str,
     data: BTreeMap<String, ByteString>,
 ) -> Secret {
     Secret {
         metadata: ObjectMeta {
-            name: Some(viewer_mount_secret_name(viewer, config)),
+            name: Some(name.to_owned()),
             namespace: Some(viewer_namespace.to_owned()),
             labels: Some(viewer_mount_secret_labels(viewer, config)),
             owner_references: Some(vec![owner_reference(viewer)]),
@@ -247,6 +255,7 @@ pub async fn sync_config_account_secrets(
 ) -> Result<AccountSecretMounts, Error> {
     let mut merged_secret_data = BTreeMap::new();
     let mut mount_secret_names = Vec::new();
+    let mut used_mount_names = std::collections::HashSet::new();
 
     for config in configs {
         if config.config.spec.accounts.is_empty() {
@@ -270,23 +279,25 @@ pub async fn sync_config_account_secrets(
         let mount_name = if config.namespace == viewer_namespace {
             config_account_secret_name(&config.config)
         } else {
-            let mount_secret =
-                build_viewer_mount_secret(viewer, viewer_namespace, config, secret_data.clone());
-            let mount_name = mount_secret
-                .metadata
-                .name
-                .clone()
-                .unwrap_or_default();
+            let replica_name = resolve_viewer_mount_secret_name(config, &used_mount_names);
+            let mount_secret = build_viewer_mount_secret(
+                viewer,
+                viewer_namespace,
+                config,
+                &replica_name,
+                secret_data.clone(),
+            );
             ensure_secret(client, viewer_namespace, &mount_secret).await?;
             crate::logging::debug(&format!(
-                "secret {viewer_namespace}/{mount_name} updated ({} env keys, mount replica for S3ViewerConfig {}/{})",
+                "secret {viewer_namespace}/{replica_name} updated ({} env keys, mount replica for S3ViewerConfig {}/{})",
                 key_count,
                 config.namespace,
                 config.config.name_any()
             ));
-            mount_name
+            replica_name
         };
 
+        used_mount_names.insert(mount_name.clone());
         mount_secret_names.push(mount_name);
         merged_secret_data.extend(secret_data);
     }
@@ -318,10 +329,12 @@ pub async fn cleanup_viewer_account_mount_secrets(
         .await?;
     let active_names: std::collections::HashSet<&str> =
         active_mount_names.iter().map(String::as_str).collect();
+    let legacy_prefix = format!("{}-", resource_base_name(viewer));
 
     for secret in list.items {
         let name = secret.name_any();
-        if !active_names.contains(name.as_str()) {
+        let is_legacy_long_name = name.starts_with(&legacy_prefix) && name.ends_with("-accounts");
+        if is_legacy_long_name || !active_names.contains(name.as_str()) {
             delete_secret_if_present(client, viewer_namespace, &name).await?;
         }
     }
@@ -725,4 +738,55 @@ pub fn service_url(namespace: &str, viewer: &S3Viewer, effective: &EffectiveSpec
 
 pub fn ingress_url(ingress: &ViewerIngressSpec) -> String {
     format!("https://{}", ingress.host)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::crd::{S3ViewerConfig, S3ViewerConfigSpec};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+
+    fn resolved_config(namespace: &str, name: &str) -> ResolvedConfig {
+        ResolvedConfig {
+            namespace: namespace.to_owned(),
+            config: S3ViewerConfig {
+                metadata: ObjectMeta {
+                    name: Some(name.to_owned()),
+                    namespace: Some(namespace.to_owned()),
+                    ..Default::default()
+                },
+                spec: S3ViewerConfigSpec {
+                    accounts: vec![],
+                },
+                status: None,
+            },
+        }
+    }
+
+    #[test]
+    fn mount_secret_name_matches_config_secret_name() {
+        let config = resolved_config("timelord", "timelord-tchoupinax-backups");
+        assert_eq!(
+            resolve_viewer_mount_secret_name(&config, &std::collections::HashSet::new()),
+            "timelord-tchoupinax-backups-accounts"
+        );
+    }
+
+    #[test]
+    fn mount_secret_name_adds_namespace_prefix_on_collision() {
+        let first = resolved_config("iron", "archive");
+        let second = resolved_config("copper", "archive");
+        let mut used = std::collections::HashSet::new();
+
+        assert_eq!(
+            resolve_viewer_mount_secret_name(&first, &used),
+            "archive-accounts"
+        );
+        used.insert("archive-accounts".to_owned());
+
+        assert_eq!(
+            resolve_viewer_mount_secret_name(&second, &used),
+            "copper-archive-accounts"
+        );
+    }
 }

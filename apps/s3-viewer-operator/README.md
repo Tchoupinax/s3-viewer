@@ -9,6 +9,7 @@ Based on [rust-kubernetes-operator-example](https://github.com/Pscheidl/rust-kub
 When you create a `S3Viewer` custom resource, the operator reconciles:
 
 - a `Secret` per watched `S3ViewerConfig` in that config's namespace (owned by the `S3ViewerConfig`, named `{config-name}-accounts`)
+- when the `S3Viewer` runs in another namespace, a mount copy of that secret is created in the viewer namespace using the same `{config-name}-accounts` name (owned by the `S3Viewer`)
 - a `Deployment` running the s3-viewer container image
 - a `Service` exposing the app inside the cluster
 - an optional `Ingress` when `spec.ingress` is set
