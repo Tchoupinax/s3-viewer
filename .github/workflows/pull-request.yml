@@ -167,7 +167,7 @@ jobs:
         sed -i "s|^  defaultAppImage: .*|  defaultAppImage: ghcr.io/tchoupinax/s3-viewer:latest-${{ github.sha }}|" charts/s3-viewer/values.yaml
 
     - name: Install Helm
-      uses: azure/setup-helm@v4
+      uses: azure/setup-helm@v5
 
     - name: Lint chart
       run: helm lint charts/s3-viewer
