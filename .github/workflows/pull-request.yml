@@ -51,7 +51,7 @@ jobs:
     if: needs.changes.outputs.operator == 'true'
     steps:
     - name: Check operator code quality 🫆
-      uses: tchoupinax/repo-config/shared-actions/steps/rust/lint@master
+      uses: tchoupinax/repo-config/shared-actions/steps/rust/lint@v0
       with:
         workingDirectory: apps/s3-viewer-operator
 
@@ -64,7 +64,7 @@ jobs:
       needs.lint.result == 'success'
     steps:
     - name: Check application build success 🦫
-      uses: tchoupinax/repo-config/shared-actions/steps/node/build@master
+      uses: tchoupinax/repo-config/shared-actions/steps/node/build@v0
       with:
         workingDirectory: apps/s3-viewer
         nodeVersion: 26
@@ -78,7 +78,7 @@ jobs:
       needs.lint-operator.result == 'success'
     steps:
     - name: Check operator build success 🦫
-      uses: tchoupinax/repo-config/shared-actions/steps/rust/build@master
+      uses: tchoupinax/repo-config/shared-actions/steps/rust/build@v0
       with:
         workingDirectory: apps/s3-viewer-operator
 
