@@ -25,6 +25,8 @@ use s3_viewer_operator::viewer_index::{register_viewer, unregister_viewer, Viewe
 use s3_viewer_operator::Error;
 use tokio::time::Duration;
 
+const ERROR_REQUEUE_SECS: u64 = 3;
+
 #[tokio::main]
 async fn main() {
     rustls::crypto::ring::default_provider()
@@ -56,7 +58,6 @@ async fn main() {
     let config_api: Api<S3ViewerConfig> = Api::all(kubernetes_client.clone());
     let context = Arc::new(ContextData {
         client: kubernetes_client,
-        cluster_url: cluster_url.clone(),
         viewer_index: ViewerIndex::new(),
         metrics,
     });
@@ -132,7 +133,20 @@ async fn publish_error_status(
         message: Some(error.to_string()),
         url: None,
     };
+
+    let api: Api<S3Viewer> = Api::namespaced(client.clone(), namespace);
+    match api.get(name).await {
+        Ok(viewer) if !status_needs_update(viewer.status.as_ref(), &status) => return Ok(()),
+        Ok(_) => {}
+        Err(source) if is_not_found(&source) => return Ok(()),
+        Err(source) => return Err(Error::KubeError { source }),
+    }
+
     update_status(client, name, namespace, status).await
+}
+
+fn error_requeue_action() -> Action {
+    Action::requeue(Duration::from_secs(ERROR_REQUEUE_SECS))
 }
 
 fn is_not_found(err: &kube::Error) -> bool {
@@ -166,9 +180,13 @@ fn log_controller_error(
 
 struct ContextData {
     client: Client,
-    cluster_url: String,
     viewer_index: ViewerIndex,
     metrics: Arc<OperatorMetrics>,
+}
+
+enum ReconcileOutcome {
+    Ok(Action),
+    Failed(Action),
 }
 
 enum ViewerAction {
@@ -179,24 +197,39 @@ enum ViewerAction {
 
 async fn reconcile(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<Action, Error> {
     let started = std::time::Instant::now();
-    let result = reconcile_viewer(viewer, context.clone()).await;
+    let outcome = reconcile_viewer(viewer, context.clone()).await;
     let duration = started.elapsed().as_secs_f64();
 
-    context.metrics.record_reconcile(
-        if result.is_ok() { "success" } else { "error" },
-        duration,
-    );
+    let (action, reconcile_status) = match outcome {
+        ReconcileOutcome::Ok(action) => (action, "success"),
+        ReconcileOutcome::Failed(action) => (action, "error"),
+    };
+
+    context
+        .metrics
+        .record_reconcile(reconcile_status, duration);
     context
         .metrics
         .set_viewers_managed(context.viewer_index.viewer_count() as i64);
 
-    result
+    Ok(action)
 }
 
-async fn reconcile_viewer(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> Result<Action, Error> {
-    let namespace = viewer.namespace().ok_or_else(|| {
-        Error::UserInputError("Expected S3Viewer resource to be namespaced.".to_owned())
-    })?;
+async fn reconcile_viewer(
+    viewer: Arc<S3Viewer>,
+    context: Arc<ContextData>,
+) -> ReconcileOutcome {
+    let namespace = match viewer.namespace() {
+        Some(namespace) => namespace,
+        None => {
+            let error = Error::UserInputError(
+                "Expected S3Viewer resource to be namespaced.".to_owned(),
+            );
+            let name = viewer.name_any();
+            handle_reconcile_error(&context.client, "unknown", &name, &error).await;
+            return ReconcileOutcome::Failed(error_requeue_action());
+        }
+    };
     let name = viewer.name_any();
 
     let viewer = match fetch_viewer(&context.client, &namespace, &name).await {
@@ -204,17 +237,17 @@ async fn reconcile_viewer(viewer: Arc<S3Viewer>, context: Arc<ContextData>) -> R
         Err(Error::KubeError { source }) if is_not_found(&source) => viewer,
         Err(err) => {
             handle_reconcile_error(&context.client, &namespace, &name, &err).await;
-            return Err(err);
+            return ReconcileOutcome::Failed(error_requeue_action());
         }
     };
 
     register_viewer(&context.viewer_index, &viewer);
 
     match reconcile_action(viewer, context.clone()).await {
-        Ok(action) => Ok(action),
+        Ok(action) => ReconcileOutcome::Ok(action),
         Err(error) => {
             handle_reconcile_error(&context.client, &namespace, &name, &error).await;
-            Err(error)
+            ReconcileOutcome::Failed(error_requeue_action())
         }
     }
 }
@@ -419,21 +452,10 @@ async fn update_status(
     }
 }
 
-fn on_error(viewer: Arc<S3Viewer>, error: &Error, context: Arc<ContextData>) -> Action {
+fn on_error(_viewer: Arc<S3Viewer>, error: &Error, _context: Arc<ContextData>) -> Action {
     if error_is_object_gone(error) {
         return Action::await_change();
     }
 
-    let namespace = viewer
-        .namespace()
-        .unwrap_or_else(|| "unknown".to_owned());
-    let name = viewer.name_any();
-    logging::warn(&format!(
-        "reconcile retry scheduled for s3viewer {} (Kubernetes API: {}): {}",
-        format_reconcile_target(&namespace, &name),
-        context.cluster_url,
-        error
-    ));
-
-    Action::requeue(Duration::from_secs(5))
+    error_requeue_action()
 }
