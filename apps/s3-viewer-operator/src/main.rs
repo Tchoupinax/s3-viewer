@@ -58,7 +58,6 @@ async fn main() {
     let config_api: Api<S3ViewerConfig> = Api::all(kubernetes_client.clone());
     let context = Arc::new(ContextData {
         client: kubernetes_client,
-        cluster_url: cluster_url.clone(),
         viewer_index: ViewerIndex::new(),
         metrics,
     });
@@ -181,7 +180,6 @@ fn log_controller_error(
 
 struct ContextData {
     client: Client,
-    cluster_url: String,
     viewer_index: ViewerIndex,
     metrics: Arc<OperatorMetrics>,
 }
