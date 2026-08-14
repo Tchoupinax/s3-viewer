@@ -1,6 +1,6 @@
 [tools]
 node = "26"
-rust = "1.95"
+rust = "1.97"
 k3d = "latest"
 tilt = "latest"
 helm = "latest"
