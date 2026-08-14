@@ -27,4 +27,4 @@ thiserror = "2"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 serde_yaml = "0.9"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "logging", "tls12"] }
-prometheus = "0.13"
+prometheus = "0.14"
