@@ -37,5 +37,5 @@
     "vite-plugin-eslint2": "5.3.0",
     "vue-tsc": "3.3.11"
   },
-  "packageManager": "pnpm@11.26.0"
+  "packageManager": "pnpm@12.4.2"
 }
