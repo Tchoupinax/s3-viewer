@@ -1,5 +1,10 @@
 <template>
+  <LoginGate
+    v-if="authChecked && authRequired && !authenticated"
+    @success="onSignedIn"
+  />
   <div
+    v-else-if="authChecked"
     class="h-screen overflow-hidden bg-gradient-to-br from-sky-50 via-white to-indigo-50 text-slate-900"
   >
     <FileDisplaying
@@ -84,6 +89,14 @@
         </div>
 
         <div class="flex flex-wrap items-stretch gap-3 min-h-[4.5rem]">
+          <button
+            v-if="authRequired"
+            type="button"
+            class="self-center px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-full hover:bg-slate-50"
+            @click="logout"
+          >
+            Sign out
+          </button>
           <template v-if="stats && stats.length">
             <div
               v-for="stat of stats"
@@ -497,6 +510,7 @@ import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
 import type { EmptyBucketPreviewPayload } from "~/components/empty-bucket-dialog.vue";
 import EmptyBucketDialog from "~/components/empty-bucket-dialog.vue";
 import FolderDeleteProgressModal from "~/components/folder-delete-progress-modal.client.vue";
+import LoginGate from "~/components/login-gate.vue";
 import ReadOnlyErrorDialog from "~/components/read-only-error-dialog.vue";
 import type {
   BucketIdentityNumber,
@@ -538,6 +552,9 @@ const stats = ref();
 const loadingBuckets = ref(false);
 const loadingDocuments = ref(false);
 const errors = ref<Array<string>>([]);
+const authChecked = ref(false);
+const authRequired = ref(false);
+const authenticated = ref(false);
 const documentsViewMode = ref<"list" | "tree">("tree");
 const treeCollapsedPaths = ref<Set<string>>(new Set());
 
@@ -1169,8 +1186,17 @@ const openFile = async (filename: string) => {
   }
 };
 
-onMounted(() => {
-  loadBuckets();
+onMounted(async () => {
+  const session = await $fetch<{
+    data: { authenticated: boolean; required: boolean };
+  }>("/api/auth/session");
+  authRequired.value = session.data.required;
+  authenticated.value = session.data.authenticated;
+  authChecked.value = true;
+
+  if (!authRequired.value || authenticated.value) {
+    loadBuckets();
+  }
 
   const localCurrentDirectory = $route.query.current_directory as string;
   if (localCurrentDirectory) {
@@ -1188,6 +1214,19 @@ onMounted(() => {
     }
   }
 });
+
+async function onSignedIn() {
+  authenticated.value = true;
+  await loadBuckets();
+}
+
+async function logout() {
+  await $fetch("/api/auth/logout", { method: "POST" });
+  authenticated.value = false;
+  buckets.value = [];
+  documents.value = [];
+  selectedBucketId.value = null;
+}
 </script>
 
 <style scoped>
