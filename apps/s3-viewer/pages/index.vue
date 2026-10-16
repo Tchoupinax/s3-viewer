@@ -418,6 +418,41 @@
                 Empty bucket
               </button>
 
+              <button
+                v-if="selectedBucketId"
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition"
+                @click="savePlace"
+              >
+                Save place
+              </button>
+
+              <button
+                v-if="savedPlace"
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium text-sky-800 bg-sky-50 border border-sky-200 rounded-full hover:bg-sky-100 transition"
+                @click="openSavedPlace"
+              >
+                Open saved place
+              </button>
+
+              <div
+                class="flex items-center gap-1 p-0.5 bg-slate-100 rounded-full"
+              >
+                <button
+                  v-for="option in objectSortOptions"
+                  :key="option.id"
+                  type="button"
+                  :class="[
+                    'px-3 py-1.5 text-xs rounded-full transition',
+                    objectSort === option.id ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500',
+                  ]"
+                  @click="toggleObjectSort(option.id)"
+                >
+                  {{ option.label }}
+                </button>
+              </div>
+
               <div
                 class="flex items-center gap-1 p-0.5 bg-slate-100 rounded-full"
               >
@@ -490,7 +525,9 @@
             <template v-if="documentsViewMode === 'list'">
               <file-explorer
                 class="shrink-0"
-                current-directory="<root>"
+                :current-directory="currentDirectory"
+                :sort-by="objectSort"
+                :sort-direction="objectSortDirection"
                 :current-level="currentIndexes.length"
                 :files="visibleListFiles"
                 :files-count="documentsCount"
@@ -500,6 +537,7 @@
                 :selected-paths="selectedPaths"
                 @enter-directory="handleDirectoryEntered"
                 @leave-directory="handleDirectoryLeft"
+                @navigate="navigateToDirectory"
                 @open-file="(filename) => openFile(filename)"
                 @request-versions="openVersions"
                 @request-link="copyDownloadLink"
@@ -544,7 +582,7 @@
                 </div>
 
                 <div
-                  v-for="node in visibleDocuments"
+                  v-for="node in sortedDocuments"
                   :key="node.fullPath"
                   class="tree-view-root"
                 >
@@ -662,6 +700,15 @@ const linkNotice = ref("");
 const documentsViewMode = ref<"list" | "tree">("tree");
 const documentQuery = ref("");
 const expandedTree = new Set<string>();
+const objectSort = ref<"name" | "size" | "modified">("name");
+const objectSortDirection = ref<"asc" | "desc">("asc");
+const objectSortOptions = [
+  { id: "name" as const, label: "Name" },
+  { id: "size" as const, label: "Size" },
+  { id: "modified" as const, label: "Date" },
+];
+const savedPlace = ref<{ bucketId: string; directory: string } | null>(null);
+const SAVED_PLACE_KEY = "s3-viewer-prefix-bookmark";
 const treeCollapsedPaths = ref<Set<string>>(new Set());
 
 const deleteDialogOpen = ref(false);
@@ -735,6 +782,27 @@ const visibleListFiles = computed(() =>
     : currentFiles.value,
 );
 
+function sortNodeList(nodes: Array<FileNode>): Array<FileNode> {
+  const factor = objectSortDirection.value === "asc" ? 1 : -1;
+  return [...nodes]
+    .sort((a, b) => {
+      if (a.isFolder !== b.isFolder) {return a.isFolder ? -1 : 1;}
+      if (objectSort.value === "size") {return (a.size - b.size) * factor;}
+      if (objectSort.value === "modified") {
+        const left = a.lastModified ? new Date(a.lastModified).getTime() : 0;
+        const right = b.lastModified ? new Date(b.lastModified).getTime() : 0;
+        return (left - right) * factor;
+      }
+      return a.name.localeCompare(b.name) * factor;
+    })
+    .map(node => ({
+      ...node,
+      children: node.children ? sortNodeList(node.children) : node.children,
+    }));
+}
+
+const sortedDocuments = computed(() => sortNodeList(visibleDocuments.value));
+
 function sortFilesForList(files: FileNode[]): FileNode[] {
   return [...files].sort((a, b) => {
     if (a.isFolder && !b.isFolder) {return -1;}
@@ -746,7 +814,7 @@ function sortFilesForList(files: FileNode[]): FileNode[] {
 const selectableListItems = computed(() => {
   if (documentsViewMode.value === "tree") {
     return flattenVisibleTree(
-      visibleDocuments.value,
+      sortedDocuments.value,
       searchActive.value ? expandedTree : treeCollapsedPaths.value,
     );
   }
@@ -1420,6 +1488,64 @@ const selectBucket = async (bucketIdentityNumber: BucketIdentityNumber) => {
   }
 };
 
+function toggleObjectSort(sort: "name" | "size" | "modified") {
+  if (objectSort.value === sort) {
+    objectSortDirection.value = objectSortDirection.value === "asc" ? "desc" : "asc";
+    return;
+  }
+  objectSort.value = sort;
+  objectSortDirection.value = "asc";
+}
+
+function savePlace() {
+  if (!selectedBucketId.value) {return;}
+  const place = {
+    bucketId: selectedBucketId.value,
+    directory: currentDirectory.value || "<root>",
+  };
+  savedPlace.value = place;
+  localStorage.setItem(SAVED_PLACE_KEY, JSON.stringify(place));
+}
+
+function navigateToDirectory(path: string) {
+  const target = path || "<root>";
+  currentDirectory.value = target;
+  $router.replace({ query: { ...$route.query, current_directory: target } });
+
+  if (target === "<root>") {
+    currentIndexes.value = [];
+    currentFiles.value = documents.value ?? [];
+    return;
+  }
+
+  const parts = target.split("/").slice(1);
+  let next = documents.value ?? [];
+  const indexes: number[] = [];
+
+  for (const part of parts) {
+    const folderIndex = next.findIndex(file => file.name === part);
+    if (folderIndex < 0) {
+      currentIndexes.value = [];
+      currentFiles.value = documents.value ?? [];
+      currentDirectory.value = "<root>";
+      return;
+    }
+    indexes.push(folderIndex);
+    next = next[folderIndex]?.children ?? [];
+  }
+
+  currentIndexes.value = indexes;
+  currentFiles.value = next;
+}
+
+async function openSavedPlace() {
+  if (!savedPlace.value) {return;}
+  if (savedPlace.value.bucketId !== selectedBucketId.value) {
+    await selectBucket(savedPlace.value.bucketId as BucketIdentityNumber);
+  }
+  navigateToDirectory(savedPlace.value.directory);
+}
+
 const handleDirectoryEntered = (folderName: string) => {
   const folderIndex = currentFiles.value.findIndex(
     f => f.name === folderName,
@@ -1560,6 +1686,15 @@ async function copyDownloadLink(node: FileNode) {
 }
 
 onMounted(async () => {
+  const storedPlace = localStorage.getItem(SAVED_PLACE_KEY);
+  if (storedPlace) {
+    try {
+      savedPlace.value = JSON.parse(storedPlace) as { bucketId: string; directory: string };
+    } catch {
+      savedPlace.value = null;
+    }
+  }
+
   const session = await $fetch<{
     data: { authenticated: boolean; required: boolean };
   }>("/api/auth/session");

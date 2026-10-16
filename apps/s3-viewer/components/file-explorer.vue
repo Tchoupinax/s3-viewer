@@ -15,19 +15,21 @@
     <div
       class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
     >
-      <div class="flex items-center min-w-0 gap-2 text-sm text-slate-700">
+      <div class="flex items-center min-w-0 gap-1 text-sm text-slate-700 overflow-x-auto">
         <button
-          v-if="currentLevel > 0"
+          v-for="(crumb, index) in breadcrumbs"
+          :key="crumb.path"
           type="button"
-          class="shrink-0 inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-600 bg-white/90 border border-slate-200 rounded-full shadow-sm hover:bg-slate-50 transition"
-          @click="back"
+          class="shrink-0 inline-flex items-center gap-1 text-xs font-medium"
+          :class="index === breadcrumbs.length - 1 ? 'text-slate-900' : 'text-slate-500 hover:text-slate-800'"
+          @click="goTo(crumb.path)"
         >
-          Back
+          {{ crumb.label }}
+          <span
+            v-if="index < breadcrumbs.length - 1"
+            class="text-slate-300"
+          >/</span>
         </button>
-
-        <span class="font-medium truncate text-slate-800">
-          {{ formattedDirectory }}
-        </span>
       </div>
 
       <div
@@ -220,6 +222,7 @@ const emit = defineEmits<{
   "toggle-select": [file: FileNode];
   "clear-selection": [];
   "show-details": [file: FileNode];
+  navigate: [path: string];
 }>();
 const props = defineProps({
   currentDirectory: { type: String, required: true },
@@ -233,6 +236,8 @@ const props = defineProps({
   },
   files: { type: Array as PropType<Array<FileNode>>, required: true },
   filesCount: { type: Number, default: undefined },
+  sortBy: { type: String as PropType<"name" | "size" | "modified">, default: "name" },
+  sortDirection: { type: String as PropType<"asc" | "desc">, default: "asc" },
 });
 
 const selectedIndex = ref(0);
@@ -245,16 +250,42 @@ async function onDrop(event: DragEvent) {
   if (items.length) {emit("uploadFiles", items);}
 }
 
-const formattedDirectory = computed(() =>
-  props.currentDirectory.split("/").join(" / "),
-);
-const sortedFiles = computed(() => {
-  return [...props.files].sort((a, b) => {
-    if (a.isFolder && !b.isFolder) {return -1;}
-    if (!a.isFolder && b.isFolder) {return 1;}
-    return a.name.localeCompare(b.name);
-  });
+const breadcrumbs = computed(() => {
+  const parts = props.currentDirectory.split("/").filter(Boolean);
+  const crumbs: Array<{ label: string; path: string }> = [];
+  let path = "";
+
+  for (const part of parts) {
+    path = path ? `${path}/${part}` : part;
+    crumbs.push({
+      path,
+      label: part === "<root>" ? "All files" : part,
+    });
+  }
+
+  return crumbs.length ? crumbs : [{ path: "<root>", label: "All files" }];
 });
+
+function compareNodes(a: FileNode, b: FileNode) {
+  if (a.isFolder !== b.isFolder) {return a.isFolder ? -1 : 1;}
+  const factor = props.sortDirection === "asc" ? 1 : -1;
+  if (props.sortBy === "size") {return (a.size - b.size) * factor;}
+  if (props.sortBy === "modified") {
+    const left = a.lastModified ? new Date(a.lastModified).getTime() : 0;
+    const right = b.lastModified ? new Date(b.lastModified).getTime() : 0;
+    return (left - right) * factor;
+  }
+  return a.name.localeCompare(b.name) * factor;
+}
+
+const sortedFiles = computed(() => [...props.files].sort(compareNodes));
+
+function goTo(path: string) {
+  if (path === props.currentDirectory) {return;}
+  $router.replace({ query: { ...$route.query, current_directory: path } });
+  emit("navigate", path);
+  selectedIndex.value = 0;
+}
 
 const enterDirectory = (folderName: string) => {
   $router.replace({
@@ -302,11 +333,8 @@ function onRowEnter(file: FileNode) {
 }
 
 const back = () => {
-  const parent = props.currentDirectory.split("/").slice(0, -1).join("/");
-  $router.replace({ query: { ...$route.query, current_directory: parent } });
-
-  emit("leaveDirectory");
-  selectedIndex.value = 0;
+  const parent = props.currentDirectory.split("/").slice(0, -1).join("/") || "<root>";
+  goTo(parent);
 };
 
 const handleKeyDown = (event: KeyboardEvent) => {
@@ -328,11 +356,8 @@ const handleKeyDown = (event: KeyboardEvent) => {
   }
 
   if (["Enter", "ArrowRight"].includes(event.code)) {
-    const selectedFile = [...props.files].sort((a, b) => {
-      if (a.isFolder && !b.isFolder) {return -1;}
-      if (!a.isFolder && b.isFolder) {return 1;}
-      return a.name.localeCompare(b.name);
-    })[selectedIndex.value];
+    const selectedFile = sortedFiles.value[selectedIndex.value];
+    if (!selectedFile) {return;}
 
     if (selectedFile.isFolder) {
       enterDirectory(selectedFile.name);
