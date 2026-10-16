@@ -1,46 +1,43 @@
 <template>
-  <label
-    v-tippy="{ content: 'Upload', placement: 'left' }"
-    for="dropzone-file"
-    class="flex flex-col items-center justify-center w-20 p-2 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
-  >
-    <div class="flex flex-col items-center justify-center h-full">
-      <svg
-        class="w-10 h-10 text-gray-500 dark:text-gray-400"
-        aria-hidden="true"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 20 16"
-      >
-        <path
-          stroke="currentColor"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"
-        />
-      </svg>
-
-      <p class="hidden mb-2 text-sm text-gray-500 xl:block dark:text-gray-400">
-        <span class="font-semibold">Click to upload</span> or drag and drop
-      </p>
-    </div>
-
-    <form>
+  <div class="flex items-center gap-1">
+    <label
+      class="px-3 py-1.5 text-xs font-medium text-sky-800 bg-sky-50 border border-sky-200 rounded-full cursor-pointer hover:bg-sky-100 transition"
+    >
+      Upload
       <input
-        id="dropzone-file"
-        hidden
+        class="hidden"
+        type="file"
+        multiple
+        @change="onFiles"
+      >
+    </label>
+
+    <label
+      class="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-full cursor-pointer hover:bg-slate-50 transition"
+    >
+      Folder
+      <input
+        class="hidden"
         type="file"
         multiple
         webkitdirectory
-        @change="($e) => emit('uploadFiles', $e)"
-      />
-      <!-- directory -->
-      <!-- webkitdirectory -->
-    </form>
-  </label>
+        @change="onFiles"
+      >
+    </label>
+  </div>
 </template>
 
 <script lang="ts" setup>
-const emit = defineEmits(["uploadFiles"]);
+import { itemsFromFileList, type UploadItem } from "~/utils/upload-files";
+
+const emit = defineEmits<{
+  uploadFiles: [items: UploadItem[]];
+}>();
+
+function onFiles(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (!input.files?.length) {return;}
+  emit("uploadFiles", itemsFromFileList(input.files));
+  input.value = "";
+}
 </script>

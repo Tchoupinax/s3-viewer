@@ -1,5 +1,17 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div
+    class="relative flex flex-col h-full"
+    @dragover.prevent="dragOver = true"
+    @dragleave.prevent="dragOver = false"
+    @drop.prevent="onDrop"
+  >
+    <div
+      v-if="dragOver && displayUploadButton"
+      class="absolute inset-0 z-10 flex items-center justify-center text-sm font-medium text-sky-800 border-2 border-dashed rounded-xl pointer-events-none border-sky-300 bg-sky-50/80"
+    >
+      Drop files to upload
+    </div>
+
     <div
       class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
     >
@@ -190,24 +202,25 @@ import { format } from "timeago.js";
 import { computed, type PropType,ref, watch } from "vue";
 
 import type { FileNode } from "~/server/types/file-node";
+import { itemsFromDataTransfer, type UploadItem } from "~/utils/upload-files";
 
 const $router = useRouter();
 const $route = useRoute();
 
-const emit = defineEmits([
-  "enterDirectory",
-  "leaveDirectory",
-  "openFile",
-  "request-versions",
-  "request-link",
-  "uploadFiles",
-  "request-delete",
-  "request-copy",
-  "select-node",
-  "toggle-select",
-  "clear-selection",
-  "show-details",
-]);
+const emit = defineEmits<{
+  enterDirectory: [folderName: string];
+  leaveDirectory: [];
+  openFile: [filePath: string];
+  uploadFiles: [items: UploadItem[]];
+  "request-versions": [file: FileNode];
+  "request-link": [file: FileNode];
+  "request-delete": [file: FileNode];
+  "request-copy": [file: FileNode];
+  "select-node": [file: FileNode, event: MouseEvent];
+  "toggle-select": [file: FileNode];
+  "clear-selection": [];
+  "show-details": [file: FileNode];
+}>();
 const props = defineProps({
   currentDirectory: { type: String, required: true },
   currentLevel: { type: Number, required: true },
@@ -223,6 +236,14 @@ const props = defineProps({
 });
 
 const selectedIndex = ref(0);
+const dragOver = ref(false);
+
+async function onDrop(event: DragEvent) {
+  dragOver.value = false;
+  if (!props.displayUploadButton || !event.dataTransfer) {return;}
+  const items = await itemsFromDataTransfer(event.dataTransfer);
+  if (items.length) {emit("uploadFiles", items);}
+}
 
 const formattedDirectory = computed(() =>
   props.currentDirectory.split("/").join(" / "),
