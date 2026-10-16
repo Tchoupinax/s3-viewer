@@ -37,6 +37,20 @@
       @close="readOnlyErrorOpen = false"
     />
 
+    <CopyObjectDialog
+      :open="copyDialogOpen"
+      :busy="copyBusy"
+      :error="copyError"
+      :source-key="copySource?.fullPath ?? ''"
+      :buckets="sameAccountBuckets"
+      :destination-bucket-id="copyDestinationBucketId"
+      :destination-key="copyDestinationKey"
+      @close="copyDialogOpen = false"
+      @confirm="confirmCopy"
+      @update:destination-bucket-id="copyDestinationBucketId = $event"
+      @update:destination-key="copyDestinationKey = $event"
+    />
+
     <BucketEmptyWaitingModal
       :open="emptyBucketDeleting"
       :bucket-name="emptyBucketWaitingBucketName"
@@ -394,6 +408,7 @@
                 @leave-directory="handleDirectoryLeft"
                 @open-file="(filename) => openFile(filename)"
                 @request-delete="openDeleteDialog"
+                @request-copy="openCopyDialog"
                 @select-node="handleSelectNode"
                 @toggle-select="handleToggleSelect"
                 @clear-selection="clearSelection"
@@ -447,6 +462,7 @@
                     @toggle="toggleTreePath"
                     @open-file="openFile"
                     @request-delete="openDeleteDialog"
+                    @request-copy="openCopyDialog"
                     @select-node="handleSelectNode"
                     @toggle-select="handleToggleSelect"
                     @clear-selection="clearSelection"
@@ -475,6 +491,7 @@ import { match } from "ts-pattern";
 import { computed,onMounted, ref, watch } from "vue";
 
 import BucketEmptyWaitingModal from "~/components/bucket-empty-waiting-modal.vue";
+import CopyObjectDialog from "~/components/copy-object-dialog.vue";
 import type { DeletePreviewPayload } from "~/components/delete-object-dialog.vue";
 import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
 import type { EmptyBucketPreviewPayload } from "~/components/empty-bucket-dialog.vue";
@@ -552,6 +569,12 @@ const selectedBucketReadOnly = ref(false);
 const selectedBucketReadOnlyReason = ref<string | null>(null);
 const readOnlyErrorOpen = ref(false);
 const readOnlyErrorMessage = ref("");
+const copyDialogOpen = ref(false);
+const copyBusy = ref(false);
+const copyError = ref<string | null>(null);
+const copySource = ref<FileNode | null>(null);
+const copyDestinationBucketId = ref("");
+const copyDestinationKey = ref("");
 
 const selectedPaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
@@ -1019,6 +1042,55 @@ const sortedBuckets = computed(() =>
 const selectedBucket = computed(() =>
   buckets.value.find(b => b.id === selectedBucketId.value) ?? null,
 );
+
+const sameAccountBuckets = computed(() =>
+  buckets.value.filter(
+    bucket =>
+      bucket.errorMessage === null &&
+      bucket.accountId === selectedBucket.value?.accountId,
+  ),
+);
+
+function openCopyDialog(node: FileNode) {
+  if (!selectedBucketId.value || !guardWriteAccess()) {return;}
+  copySource.value = node;
+  copyDestinationBucketId.value = selectedBucketId.value;
+  copyDestinationKey.value = node.fullPath;
+  copyError.value = null;
+  copyDialogOpen.value = true;
+}
+
+async function confirmCopy(move: boolean) {
+  if (!selectedBucketId.value || !copySource.value) {return;}
+  copyBusy.value = true;
+  copyError.value = null;
+
+  try {
+    await $fetch(`/api/buckets/${selectedBucketId.value}/objects/copy`, {
+      method: "POST",
+      body: {
+        sourceKey: copySource.value.fullPath,
+        isFolder: copySource.value.isFolder,
+        destinationBucketId: copyDestinationBucketId.value,
+        destinationKey: copyDestinationKey.value.trim(),
+        move,
+      },
+    });
+    copyDialogOpen.value = false;
+    await refreshDocuments();
+    await loadBuckets();
+  } catch (error: unknown) {
+    if (isReadOnlyFetchError(error)) {
+      selectedBucketReadOnly.value = true;
+      copyDialogOpen.value = false;
+      showReadOnlyError(getFetchErrorMessage(error, "Copy failed"));
+    } else {
+      copyError.value = getFetchErrorMessage(error, "Copy failed");
+    }
+  } finally {
+    copyBusy.value = false;
+  }
+}
 
 const loadBuckets = async () => {
   loadingBuckets.value = true;
