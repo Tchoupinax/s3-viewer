@@ -56,6 +56,15 @@
       @update:destination-key="copyDestinationKey = $event"
     />
 
+    <ObjectMetadataPanel
+      :open="metadataOpen"
+      :loading="metadataLoading"
+      :error="metadataError"
+      :object-key="metadataKey"
+      :metadata="metadata"
+      @close="metadataOpen = false"
+    />
+
     <BucketEmptyWaitingModal
       :open="emptyBucketDeleting"
       :bucket-name="emptyBucketWaitingBucketName"
@@ -445,6 +454,7 @@
                 @select-node="handleSelectNode"
                 @toggle-select="handleToggleSelect"
                 @clear-selection="clearSelection"
+                @show-details="openMetadata"
               />
             </template>
 
@@ -499,6 +509,7 @@
                     @select-node="handleSelectNode"
                     @toggle-select="handleToggleSelect"
                     @clear-selection="clearSelection"
+                    @show-details="openMetadata"
                   />
                 </div>
               </div>
@@ -538,12 +549,14 @@ import type { EmptyBucketPreviewPayload } from "~/components/empty-bucket-dialog
 import EmptyBucketDialog from "~/components/empty-bucket-dialog.vue";
 import FolderDeleteProgressModal from "~/components/folder-delete-progress-modal.client.vue";
 import LoginGate from "~/components/login-gate.vue";
+import ObjectMetadataPanel from "~/components/object-metadata-panel.vue";
 import ReadOnlyErrorDialog from "~/components/read-only-error-dialog.vue";
 import type {
   BucketIdentityNumber,
 } from "~/functions/bucket-identity-number";
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { FileNode } from "~/server/types/file-node";
+import type { ObjectMetadata } from "~/server/types/object-metadata";
 import { getFetchErrorMessage, isReadOnlyFetchError } from "~/utils/api-error";
 import { filterFileTree, flattenSearchHits } from "~/utils/filter-documents";
 import {
@@ -622,6 +635,11 @@ const copyError = ref<string | null>(null);
 const copySource = ref<FileNode | null>(null);
 const copyDestinationBucketId = ref("");
 const copyDestinationKey = ref("");
+const metadataOpen = ref(false);
+const metadataLoading = ref(false);
+const metadataError = ref<string | null>(null);
+const metadataKey = ref<string | null>(null);
+const metadata = ref<ObjectMetadata | null>(null);
 
 const selectedPaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
@@ -1262,6 +1280,27 @@ const openFile = async (filename: string) => {
     };
   }
 };
+
+async function openMetadata(node: FileNode) {
+  if (!selectedBucketId.value || node.isFolder) {return;}
+  metadataOpen.value = true;
+  metadataLoading.value = true;
+  metadataError.value = null;
+  metadata.value = null;
+  metadataKey.value = node.fullPath;
+
+  try {
+    const res = await $fetch<{ data: ObjectMetadata }>(
+      `/api/buckets/${selectedBucketId.value}/objects/metadata`,
+      { query: { key: node.fullPath } },
+    );
+    metadata.value = res.data;
+  } catch (error: unknown) {
+    metadataError.value = getFetchErrorMessage(error, "Failed to load object details");
+  } finally {
+    metadataLoading.value = false;
+  }
+}
 
 onMounted(async () => {
   const session = await $fetch<{

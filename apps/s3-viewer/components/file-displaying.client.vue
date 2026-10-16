@@ -31,7 +31,7 @@
       </div>
 
       <div
-        v-if="type === 'jpg' || type === 'jpeg'"
+        v-if="imageUrl"
         class="max-h-full overflow-y-auto border border-gray-300"
       >
         <img
@@ -55,16 +55,28 @@
 
 <script lang="ts">
 function processLangs(title: string) {
-  if (title?.endsWith(".js")) {
-    return ["javascript"];
-  }
-
-  if (title?.endsWith(".yaml")) {
-    return ["yaml"];
-  }
-
+  if (title?.endsWith(".ts")) {return ["typescript"];}
+  if (title?.endsWith(".js")) {return ["javascript"];}
+  if (title?.endsWith(".json")) {return ["json"];}
+  if (title?.endsWith(".yaml") || title?.endsWith(".yml")) {return ["yaml"];}
+  if (title?.endsWith(".md")) {return ["markdown"];}
+  if (title?.endsWith(".css")) {return ["css"];}
+  if (title?.endsWith(".html")) {return ["html"];}
+  if (title?.endsWith(".py")) {return ["python"];}
+  if (title?.endsWith(".go")) {return ["go"];}
+  if (title?.endsWith(".rs")) {return ["rust"];}
+  if (title?.endsWith(".sh")) {return ["bash"];}
   return ["javascript"];
 }
+
+const IMAGE_TYPES: Record<string, string> = {
+  gif: "image/gif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  svg: "image/svg+xml",
+  webp: "image/webp",
+};
 
 export default {
   props: {
@@ -106,8 +118,8 @@ export default {
       this.type = data.type ?? "";
     }
 
-    if (this.type === "jpg" || this.type === "jpeg") {
-      this.imageUrl = `data:image/jpeg;base64,${this.content}`;
+    if (IMAGE_TYPES[this.type]) {
+      this.imageUrl = `data:${IMAGE_TYPES[this.type]};base64,${this.content}`;
     } else if (this.type === "pdf") {
       const base64ToBlob = (base64, mimeType) => {
         const byteCharacters = atob(base64);
@@ -123,7 +135,7 @@ export default {
       this.pdfUrl = URL.createObjectURL(pdfBlob);
     }
 
-    if (this.type !== "pdf") {
+    if (!this.imageUrl && this.type !== "pdf") {
       const { getHighlighter } = await import("shikiji");
       const shiki = await getHighlighter({
         themes: ["nord", "dark-plus"],
