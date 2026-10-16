@@ -112,6 +112,17 @@ docker run --rm -p 3000:3000 -e S3_VIEWER_ACCOUNT_... s3-viewer
 
 The app listens on port **3000** (`HOST=0.0.0.0`, `PORT=3000`).
 
+### Optional sign-in
+
+Leave these unset to keep the viewer open, which is the default. Set both to require a username and password before any bucket API call. Kubernetes probes can keep using `GET /api/health`.
+
+| Variable | Description |
+|----------|-------------|
+| `S3_VIEWER_AUTH_USER` | Username |
+| `S3_VIEWER_AUTH_PASSWORD` | Password |
+
+The session cookie lasts 12 hours.
+
 ---
 
 ## Kubernetes + operator
