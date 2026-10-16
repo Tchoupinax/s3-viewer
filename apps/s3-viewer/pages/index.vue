@@ -339,6 +339,16 @@
               </button>
 
               <button
+                v-if="selectedCount > 0"
+                type="button"
+                :disabled="archiveDownloading"
+                class="px-3 py-1.5 text-xs font-medium text-sky-800 bg-sky-50 border border-sky-200 rounded-full hover:bg-sky-100 disabled:opacity-50 transition"
+                @click="downloadSelection"
+              >
+                {{ archiveDownloading ? "Preparing zip…" : `Download zip (${selectedCount})` }}
+              </button>
+
+              <button
                 v-if="selectedCount > 0 && !selectedBucketReadOnly"
                 type="button"
                 :disabled="loadingDocuments"
@@ -425,7 +435,7 @@
                 :files-count="documentsCount"
                 :display-upload-button="false"
                 :allow-delete="!selectedBucketReadOnly"
-                :allow-select="!selectedBucketReadOnly"
+                :allow-select="true"
                 :selected-paths="selectedPaths"
                 @enter-directory="handleDirectoryEntered"
                 @leave-directory="handleDirectoryLeft"
@@ -481,7 +491,7 @@
                     :format-date="format"
                     :count-files="countFilesInNode"
                     :allow-delete="!selectedBucketReadOnly"
-                    :allow-select="!selectedBucketReadOnly"
+                    :allow-select="true"
                     @toggle="toggleTreePath"
                     @open-file="openFile"
                     @request-delete="openDeleteDialog"
@@ -615,6 +625,7 @@ const copyDestinationKey = ref("");
 
 const selectedPaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
+const archiveDownloading = ref(false);
 
 const selectedCount = computed(() => selectedPaths.value.size);
 const searchActive = computed(() => documentQuery.value.trim().length > 0);
@@ -808,6 +819,39 @@ async function openDeleteSelectedDialog() {
   const nodes = dedupeNestedSelection(getSelectedNodes());
   if (!nodes.length) {return;}
   await openDeleteDialogForNodes(nodes);
+}
+
+async function downloadSelection() {
+  const nodes = dedupeNestedSelection(getSelectedNodes());
+  if (!selectedBucketId.value || !nodes.length) {return;}
+  archiveDownloading.value = true;
+  errors.value = [];
+
+  try {
+    const blob = await $fetch<Blob>(
+      `/api/buckets/${selectedBucketId.value}/objects/archive`,
+      {
+        method: "POST",
+        body: {
+          entries: nodes.map(node => ({
+            key: node.fullPath,
+            isFolder: node.isFolder,
+          })),
+        },
+        responseType: "blob",
+      },
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "objects.zip";
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (error: unknown) {
+    errors.value = [getFetchErrorMessage(error, "Could not download the selection")];
+  } finally {
+    archiveDownloading.value = false;
+  }
 }
 
 async function openDeleteDialogForNodes(nodes: FileNode[]) {
