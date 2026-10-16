@@ -388,6 +388,15 @@
               </button>
 
               <button
+                v-if="selectedBucket && selectedBucket.errorMessage === null"
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-full hover:bg-slate-50 transition"
+                @click="toggleIncompleteUploads"
+              >
+                Incomplete uploads
+              </button>
+
+              <button
                 v-if="selectedBucket && selectedBucket.errorMessage === null && !selectedBucketReadOnly"
                 type="button"
                 :disabled="loadingDocuments"
@@ -448,6 +457,17 @@
 
           <!-- Documents content (scrollable) -->
           <div class="flex-1 p-4 overflow-y-auto">
+            <IncompleteUploads
+              v-if="incompleteUploadsOpen"
+              :uploads="incompleteUploads"
+              :loading="incompleteUploadsLoading"
+              :busy="incompleteUploadsBusy"
+              :error="incompleteUploadsError"
+              :read-only="selectedBucketReadOnly"
+              @abort="abortIncompleteUpload"
+              @abort-all="abortAllIncompleteUploads"
+            />
+
             <p
               v-if="loadingDocuments && documents.length === 0"
               class="text-sm text-slate-500"
@@ -572,6 +592,7 @@ import DeleteObjectDialog from "~/components/delete-object-dialog.vue";
 import type { EmptyBucketPreviewPayload } from "~/components/empty-bucket-dialog.vue";
 import EmptyBucketDialog from "~/components/empty-bucket-dialog.vue";
 import FolderDeleteProgressModal from "~/components/folder-delete-progress-modal.client.vue";
+import IncompleteUploads, { type IncompleteUpload } from "~/components/incomplete-uploads.vue";
 import LoginGate from "~/components/login-gate.vue";
 import ObjectMetadataPanel from "~/components/object-metadata-panel.vue";
 import ObjectVersionsPanel from "~/components/object-versions-panel.vue";
@@ -673,6 +694,11 @@ const versionsBusy = ref(false);
 const versionsError = ref<string | null>(null);
 const versionsKey = ref<string | null>(null);
 const versionsData = ref<ObjectVersions | null>(null);
+const incompleteUploadsOpen = ref(false);
+const incompleteUploadsLoading = ref(false);
+const incompleteUploadsBusy = ref(false);
+const incompleteUploadsError = ref<string | null>(null);
+const incompleteUploads = ref<IncompleteUpload[]>([]);
 
 const selectedPaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
@@ -775,6 +801,8 @@ watch(documents, () => {
 watch(selectedBucketId, () => {
   clearSelection();
   documentQuery.value = "";
+  incompleteUploadsOpen.value = false;
+  incompleteUploads.value = [];
 });
 
 watch(documentsViewMode, () => {
@@ -799,6 +827,62 @@ function showReadOnlyError(message?: string) {
     selectedBucketReadOnlyReason.value ??
     "These credentials are read-only. Write operations are not allowed.";
   readOnlyErrorOpen.value = true;
+}
+
+async function loadIncompleteUploads() {
+  if (!selectedBucketId.value) {return;}
+  incompleteUploadsLoading.value = true;
+  incompleteUploadsError.value = null;
+  try {
+    const res = await $fetch<{ data: { uploads: IncompleteUpload[] } }>(
+      `/api/buckets/${selectedBucketId.value}/uploads`,
+    );
+    incompleteUploads.value = res.data.uploads;
+  } catch (error: unknown) {
+    incompleteUploadsError.value = getFetchErrorMessage(
+      error,
+      "Could not list incomplete uploads",
+    );
+  } finally {
+    incompleteUploadsLoading.value = false;
+  }
+}
+
+async function toggleIncompleteUploads() {
+  incompleteUploadsOpen.value = !incompleteUploadsOpen.value;
+  if (incompleteUploadsOpen.value) {await loadIncompleteUploads();}
+}
+
+async function abortIncompleteUpload(upload: IncompleteUpload) {
+  if (!selectedBucketId.value || !guardWriteAccess()) {return;}
+  incompleteUploadsBusy.value = true;
+  try {
+    await $fetch(`/api/buckets/${selectedBucketId.value}/uploads`, {
+      method: "DELETE",
+      body: { key: upload.key, uploadId: upload.uploadId },
+    });
+    await loadIncompleteUploads();
+  } catch (error: unknown) {
+    handleWriteError(error, "Could not abort upload", incompleteUploadsError);
+  } finally {
+    incompleteUploadsBusy.value = false;
+  }
+}
+
+async function abortAllIncompleteUploads() {
+  if (!selectedBucketId.value || !guardWriteAccess()) {return;}
+  incompleteUploadsBusy.value = true;
+  try {
+    await $fetch(`/api/buckets/${selectedBucketId.value}/uploads`, {
+      method: "DELETE",
+      body: { all: true },
+    });
+    await loadIncompleteUploads();
+  } catch (error: unknown) {
+    handleWriteError(error, "Could not abort uploads", incompleteUploadsError);
+  } finally {
+    incompleteUploadsBusy.value = false;
+  }
 }
 
 function guardWriteAccess(): boolean {
