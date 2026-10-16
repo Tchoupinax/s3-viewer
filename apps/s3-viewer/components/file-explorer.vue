@@ -122,6 +122,15 @@
                 {{ file.children?.length ?? 0 }}
               </span>
 
+              <button
+                v-if="!file.isFolder"
+                type="button"
+                class="inline-flex items-center justify-center rounded-lg px-1.5 py-1 text-[11px] font-medium text-slate-500 hover:text-sky-700 hover:bg-sky-50 transition"
+                @click.stop="emit('request-versions', file)"
+              >
+                Versions
+              </button>
+
               <IconDownload
                 v-else
                 class="size-5 text-slate-400"
@@ -180,6 +189,7 @@ const emit = defineEmits([
   "enterDirectory",
   "leaveDirectory",
   "openFile",
+  "request-versions",
   "uploadFiles",
   "request-delete",
   "request-copy",

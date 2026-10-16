@@ -110,6 +110,14 @@
           >
             Copy
           </button>
+          <button
+            v-if="!node.isFolder"
+            type="button"
+            class="mr-1 text-[11px] font-semibold text-slate-500 hover:text-sky-700"
+            @click.stop="emit('request-versions', node)"
+          >
+            Versions
+          </button>
         </span>
 
         <button
@@ -150,6 +158,7 @@
         :allow-select="allowSelect"
         @toggle="emit('toggle', $event)"
         @open-file="emit('open-file', $event)"
+        @request-versions="emit('request-versions', $event)"
         @request-delete="emit('request-delete', $event)"
         @request-copy="emit('request-copy', $event)"
         @select-node="(node, event) => emit('select-node', node, event)"
@@ -181,6 +190,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggle: [fullPath: string];
   "open-file": [fullPath: string];
+  "request-versions": [node: FileNode];
   "request-delete": [node: FileNode];
   "request-copy": [node: FileNode];
   "select-node": [node: FileNode, event: MouseEvent];
