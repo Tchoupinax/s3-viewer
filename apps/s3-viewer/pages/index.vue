@@ -85,6 +85,13 @@
       :total="emptyBucketProgressTotal"
     />
 
+    <UploadProgressModal
+      :open="uploadOpen"
+      :uploaded="uploadUploaded"
+      :total="uploadTotal"
+      :filename="uploadFilename"
+    />
+
     <FolderDeleteProgressModal
       :open="folderDeleteProgressOpen"
       :folder-path="folderDeleteProgressPath"
@@ -387,6 +394,11 @@
                 Delete selected ({{ selectedCount }})
               </button>
 
+              <FormUploadButton
+                v-if="selectedBucket && selectedBucket.errorMessage === null && !selectedBucketReadOnly"
+                @upload-files="uploadItems"
+              />
+
               <button
                 v-if="selectedBucket && selectedBucket.errorMessage === null"
                 type="button"
@@ -482,7 +494,7 @@
                 :current-level="currentIndexes.length"
                 :files="visibleListFiles"
                 :files-count="documentsCount"
-                :display-upload-button="false"
+                :display-upload-button="!selectedBucketReadOnly"
                 :allow-delete="!selectedBucketReadOnly"
                 :allow-select="true"
                 :selected-paths="selectedPaths"
@@ -497,6 +509,7 @@
                 @toggle-select="handleToggleSelect"
                 @clear-selection="clearSelection"
                 @show-details="openMetadata"
+                @upload-files="uploadItems"
               />
             </template>
 
@@ -597,6 +610,7 @@ import LoginGate from "~/components/login-gate.vue";
 import ObjectMetadataPanel from "~/components/object-metadata-panel.vue";
 import ObjectVersionsPanel from "~/components/object-versions-panel.vue";
 import ReadOnlyErrorDialog from "~/components/read-only-error-dialog.vue";
+import UploadProgressModal from "~/components/upload-progress-modal.vue";
 import type {
   BucketIdentityNumber,
 } from "~/functions/bucket-identity-number";
@@ -606,6 +620,7 @@ import type { ObjectMetadata } from "~/server/types/object-metadata";
 import type { ObjectVersion, ObjectVersions } from "~/server/types/object-version";
 import { getFetchErrorMessage, isReadOnlyFetchError } from "~/utils/api-error";
 import { filterFileTree, flattenSearchHits } from "~/utils/filter-documents";
+import type { UploadItem } from "~/utils/upload-files";
 import {
   dedupeNestedSelection,
   flattenVisibleTree,
@@ -699,6 +714,11 @@ const incompleteUploadsLoading = ref(false);
 const incompleteUploadsBusy = ref(false);
 const incompleteUploadsError = ref<string | null>(null);
 const incompleteUploads = ref<IncompleteUpload[]>([]);
+
+const uploadOpen = ref(false);
+const uploadUploaded = ref(0);
+const uploadTotal = ref(0);
+const uploadFilename = ref<string | null>(null);
 
 const selectedPaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
@@ -882,6 +902,50 @@ async function abortAllIncompleteUploads() {
     handleWriteError(error, "Could not abort uploads", incompleteUploadsError);
   } finally {
     incompleteUploadsBusy.value = false;
+  }
+}
+
+function uploadPrefix(): string {
+  if (!currentDirectory.value || currentDirectory.value === "<root>") {
+    return "";
+  }
+  return currentDirectory.value.replace(/^<root>\/?/, "");
+}
+
+async function uploadItems(items: UploadItem[]) {
+  if (!selectedBucketId.value || !items.length || !guardWriteAccess()) {return;}
+
+  uploadOpen.value = true;
+  uploadUploaded.value = 0;
+  uploadTotal.value = items.length;
+  uploadFilename.value = null;
+
+  try {
+    for (const item of items) {
+      uploadFilename.value = item.relativePath;
+      const body = new FormData();
+      body.append("prefix", uploadPrefix());
+      body.append("relativePath", item.relativePath);
+      body.append("file", item.file, item.file.name);
+      await $fetch(`/api/buckets/${selectedBucketId.value}/objects/upload`, {
+        method: "POST",
+        body,
+      });
+      uploadUploaded.value += 1;
+    }
+
+    await refreshDocuments();
+    await loadBuckets();
+  } catch (error: unknown) {
+    if (isReadOnlyFetchError(error)) {
+      selectedBucketReadOnly.value = true;
+      showReadOnlyError(getFetchErrorMessage(error, "Upload failed"));
+    } else {
+      errors.value = [getFetchErrorMessage(error, "Upload failed")];
+    }
+  } finally {
+    uploadOpen.value = false;
+    uploadFilename.value = null;
   }
 }
 
