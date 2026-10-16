@@ -107,6 +107,15 @@
               <button
                 v-if="allowDelete"
                 type="button"
+                class="inline-flex items-center justify-center rounded-lg px-1.5 py-1 text-[11px] font-medium text-slate-500 hover:text-sky-700 hover:bg-sky-50 transition"
+                @click.stop="emit('request-copy', file)"
+              >
+                Copy
+              </button>
+
+              <button
+                v-if="allowDelete"
+                type="button"
                 class="inline-flex items-center justify-center rounded-lg p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
                 aria-label="Delete"
                 title="Delete"
@@ -150,6 +159,7 @@ const emit = defineEmits([
   "openFile",
   "uploadFiles",
   "request-delete",
+  "request-copy",
   "select-node",
   "toggle-select",
   "clear-selection",

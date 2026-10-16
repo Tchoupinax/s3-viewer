@@ -81,6 +81,14 @@
           >
             {{ node.lastModified ? formatDate(node.lastModified) : "—" }}
           </span>
+          <button
+            v-if="allowDelete"
+            type="button"
+            class="tree-node-copy"
+            @click.stop="emit('request-copy', node)"
+          >
+            Copy
+          </button>
         </span>
 
         <button
@@ -122,6 +130,7 @@
         @toggle="emit('toggle', $event)"
         @open-file="emit('open-file', $event)"
         @request-delete="emit('request-delete', $event)"
+        @request-copy="emit('request-copy', $event)"
         @select-node="(node, event) => emit('select-node', node, event)"
         @toggle-select="emit('toggle-select', $event)"
         @clear-selection="emit('clear-selection')"
@@ -151,6 +160,7 @@ const emit = defineEmits<{
   toggle: [fullPath: string];
   "open-file": [fullPath: string];
   "request-delete": [node: FileNode];
+  "request-copy": [node: FileNode];
   "select-node": [node: FileNode, event: MouseEvent];
   "toggle-select": [node: FileNode];
   "clear-selection": [];
@@ -337,6 +347,21 @@ function onRowClick(event: MouseEvent) {
   white-space: nowrap;
   font-size: 0.6875rem;
   color: rgb(148 163 184);
+}
+
+.tree-node-copy {
+  margin-right: 0.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgb(100 116 139);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tree-node-copy:hover {
+  color: rgb(3 105 161);
 }
 
 .tree-node-delete {
