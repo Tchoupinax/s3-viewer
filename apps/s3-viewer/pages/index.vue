@@ -312,8 +312,9 @@
         >
           <!-- Documents header with List/Tree toggle -->
           <div
-            class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
+            class="flex flex-col gap-3 px-4 py-3 border-b border-slate-100 bg-slate-50/60 shrink-0"
           >
+            <div class="flex items-center justify-between gap-3">
             <h2
               class="text-xs font-semibold tracking-wide uppercase text-slate-600"
             >
@@ -395,6 +396,15 @@
                 </button>
               </div>
             </div>
+            </div>
+
+            <input
+              v-model="documentQuery"
+              type="search"
+              :disabled="loadingDocuments || !documents.length"
+              placeholder="Filter by name or prefix"
+              class="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-300 disabled:opacity-50"
+            >
           </div>
 
           <!-- Documents content (scrollable) -->
@@ -411,7 +421,7 @@
                 class="shrink-0"
                 current-directory="<root>"
                 :current-level="currentIndexes.length"
-                :files="currentFiles"
+                :files="visibleListFiles"
                 :files-count="documentsCount"
                 :display-upload-button="false"
                 :allow-delete="!selectedBucketReadOnly"
@@ -429,7 +439,7 @@
             </template>
 
             <template
-              v-else-if="documentsViewMode === 'tree' && documents.length"
+              v-else-if="documentsViewMode === 'tree' && visibleDocuments.length"
             >
               <div
                 class="tree-view"
@@ -459,13 +469,13 @@
                 </div>
 
                 <div
-                  v-for="node in documents"
+                  v-for="node in visibleDocuments"
                   :key="node.fullPath"
                   class="tree-view-root"
                 >
                   <DocumentsTreeNode
                     :node="node"
-                    :collapsed-paths="treeCollapsedPaths"
+                    :collapsed-paths="searchActive ? expandedTree : treeCollapsedPaths"
                     :selected-paths="selectedPaths"
                     :format-size="formatSize"
                     :format-date="format"
@@ -483,6 +493,13 @@
                 </div>
               </div>
             </template>
+
+            <p
+              v-else-if="documentsViewMode === 'tree' && searchActive && !visibleDocuments.length"
+              class="text-sm text-slate-500"
+            >
+              No documents match this filter.
+            </p>
 
             <p
               v-else-if="documentsViewMode === 'tree' && !documents.length"
@@ -518,6 +535,7 @@ import type {
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { FileNode } from "~/server/types/file-node";
 import { getFetchErrorMessage, isReadOnlyFetchError } from "~/utils/api-error";
+import { filterFileTree, flattenSearchHits } from "~/utils/filter-documents";
 import {
   dedupeNestedSelection,
   flattenVisibleTree,
@@ -556,6 +574,8 @@ const authChecked = ref(false);
 const authRequired = ref(false);
 const authenticated = ref(false);
 const documentsViewMode = ref<"list" | "tree">("tree");
+const documentQuery = ref("");
+const expandedTree = new Set<string>();
 const treeCollapsedPaths = ref<Set<string>>(new Set());
 
 const deleteDialogOpen = ref(false);
@@ -597,6 +617,15 @@ const selectedPaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
 
 const selectedCount = computed(() => selectedPaths.value.size);
+const searchActive = computed(() => documentQuery.value.trim().length > 0);
+const visibleDocuments = computed(() =>
+  filterFileTree(documents.value, documentQuery.value),
+);
+const visibleListFiles = computed(() =>
+  searchActive.value
+    ? flattenSearchHits(documents.value, documentQuery.value)
+    : currentFiles.value,
+);
 
 function sortFilesForList(files: FileNode[]): FileNode[] {
   return [...files].sort((a, b) => {
@@ -608,9 +637,12 @@ function sortFilesForList(files: FileNode[]): FileNode[] {
 
 const selectableListItems = computed(() => {
   if (documentsViewMode.value === "tree") {
-    return flattenVisibleTree(documents.value, treeCollapsedPaths.value);
+    return flattenVisibleTree(
+      visibleDocuments.value,
+      searchActive.value ? expandedTree : treeCollapsedPaths.value,
+    );
   }
-  return sortFilesForList(currentFiles.value);
+  return sortFilesForList(visibleListFiles.value);
 });
 
 function clearSelection() {
@@ -680,6 +712,7 @@ watch(documents, () => {
 
 watch(selectedBucketId, () => {
   clearSelection();
+  documentQuery.value = "";
 });
 
 watch(documentsViewMode, () => {
