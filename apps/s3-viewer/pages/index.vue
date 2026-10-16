@@ -173,6 +173,13 @@
       </div>
 
       <div
+        v-if="linkNotice"
+        class="p-3 text-sm text-sky-800 border border-sky-100 shadow-sm rounded-xl shrink-0 bg-sky-50/80"
+      >
+        {{ linkNotice }}
+      </div>
+
+      <div
         class="grid flex-1 grid-cols-1 gap-5 mt-6 overflow-hidden lg:grid-cols-3"
       >
         <section
@@ -463,6 +470,7 @@
                 @leave-directory="handleDirectoryLeft"
                 @open-file="(filename) => openFile(filename)"
                 @request-versions="openVersions"
+                @request-link="copyDownloadLink"
                 @request-delete="openDeleteDialog"
                 @request-copy="openCopyDialog"
                 @select-node="handleSelectNode"
@@ -519,6 +527,7 @@
                     @toggle="toggleTreePath"
                     @open-file="openFile"
                     @request-versions="openVersions"
+                    @request-link="copyDownloadLink"
                     @request-delete="openDeleteDialog"
                     @request-copy="openCopyDialog"
                     @select-node="handleSelectNode"
@@ -613,6 +622,7 @@ const errors = ref<Array<string>>([]);
 const authChecked = ref(false);
 const authRequired = ref(false);
 const authenticated = ref(false);
+const linkNotice = ref("");
 const documentsViewMode = ref<"list" | "tree">("tree");
 const documentQuery = ref("");
 const expandedTree = new Set<string>();
@@ -1381,6 +1391,23 @@ async function openMetadata(node: FileNode) {
     metadataError.value = getFetchErrorMessage(error, "Failed to load object details");
   } finally {
     metadataLoading.value = false;
+  }
+}
+
+async function copyDownloadLink(node: FileNode) {
+  if (!selectedBucketId.value || node.isFolder) {return;}
+  linkNotice.value = "";
+
+  try {
+    const res = await $fetch<{ data: { url: string; expiresIn: number } }>(
+      `/api/buckets/${selectedBucketId.value}/objects/presign`,
+      { query: { key: node.fullPath } },
+    );
+    await navigator.clipboard.writeText(res.data.url);
+    const minutes = Math.round(res.data.expiresIn / 60);
+    linkNotice.value = `Download link copied. It expires in ${minutes} minutes.`;
+  } catch (error: unknown) {
+    errors.value = [getFetchErrorMessage(error, "Could not create a download link")];
   }
 }
 
