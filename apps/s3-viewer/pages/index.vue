@@ -65,6 +65,19 @@
       @close="metadataOpen = false"
     />
 
+    <ObjectVersionsPanel
+      :open="versionsOpen"
+      :loading="versionsLoading"
+      :busy="versionsBusy"
+      :error="versionsError"
+      :object-key="versionsKey"
+      :read-only="selectedBucketReadOnly"
+      :data="versionsData"
+      @close="versionsOpen = false"
+      @restore="restoreVersion"
+      @remove="removeVersion"
+    />
+
     <BucketEmptyWaitingModal
       :open="emptyBucketDeleting"
       :bucket-name="emptyBucketWaitingBucketName"
@@ -449,6 +462,7 @@
                 @enter-directory="handleDirectoryEntered"
                 @leave-directory="handleDirectoryLeft"
                 @open-file="(filename) => openFile(filename)"
+                @request-versions="openVersions"
                 @request-delete="openDeleteDialog"
                 @request-copy="openCopyDialog"
                 @select-node="handleSelectNode"
@@ -504,6 +518,7 @@
                     :allow-select="true"
                     @toggle="toggleTreePath"
                     @open-file="openFile"
+                    @request-versions="openVersions"
                     @request-delete="openDeleteDialog"
                     @request-copy="openCopyDialog"
                     @select-node="handleSelectNode"
@@ -550,6 +565,7 @@ import EmptyBucketDialog from "~/components/empty-bucket-dialog.vue";
 import FolderDeleteProgressModal from "~/components/folder-delete-progress-modal.client.vue";
 import LoginGate from "~/components/login-gate.vue";
 import ObjectMetadataPanel from "~/components/object-metadata-panel.vue";
+import ObjectVersionsPanel from "~/components/object-versions-panel.vue";
 import ReadOnlyErrorDialog from "~/components/read-only-error-dialog.vue";
 import type {
   BucketIdentityNumber,
@@ -557,6 +573,7 @@ import type {
 import type { S3ViewerBucket } from "~/server/types/bucket";
 import type { FileNode } from "~/server/types/file-node";
 import type { ObjectMetadata } from "~/server/types/object-metadata";
+import type { ObjectVersion, ObjectVersions } from "~/server/types/object-version";
 import { getFetchErrorMessage, isReadOnlyFetchError } from "~/utils/api-error";
 import { filterFileTree, flattenSearchHits } from "~/utils/filter-documents";
 import {
@@ -640,6 +657,12 @@ const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
 const metadataKey = ref<string | null>(null);
 const metadata = ref<ObjectMetadata | null>(null);
+const versionsOpen = ref(false);
+const versionsLoading = ref(false);
+const versionsBusy = ref(false);
+const versionsError = ref<string | null>(null);
+const versionsKey = ref<string | null>(null);
+const versionsData = ref<ObjectVersions | null>(null);
 
 const selectedPaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
@@ -1271,6 +1294,65 @@ const handleDirectoryLeft = () => {
     .slice(0, -1)
     .join("/");
 };
+
+async function loadVersions() {
+  if (!selectedBucketId.value || !versionsKey.value) {return;}
+  versionsLoading.value = true;
+  versionsError.value = null;
+  try {
+    const res = await $fetch<{ data: ObjectVersions }>(
+      `/api/buckets/${selectedBucketId.value}/objects/versions`,
+      { query: { key: versionsKey.value } },
+    );
+    versionsData.value = res.data;
+  } catch (error: unknown) {
+    versionsError.value = getFetchErrorMessage(error, "Could not load versions");
+  } finally {
+    versionsLoading.value = false;
+  }
+}
+
+async function openVersions(node: FileNode) {
+  if (!selectedBucketId.value || node.isFolder) {return;}
+  versionsKey.value = node.fullPath;
+  versionsData.value = null;
+  versionsOpen.value = true;
+  await loadVersions();
+}
+
+async function restoreVersion(version: ObjectVersion) {
+  if (!selectedBucketId.value || !versionsKey.value || !guardWriteAccess()) {return;}
+  versionsBusy.value = true;
+  try {
+    await $fetch(`/api/buckets/${selectedBucketId.value}/objects/versions`, {
+      method: "POST",
+      body: { key: versionsKey.value, versionId: version.versionId },
+    });
+    await loadVersions();
+    await refreshDocuments();
+  } catch (error: unknown) {
+    handleWriteError(error, "Could not restore version", versionsError);
+  } finally {
+    versionsBusy.value = false;
+  }
+}
+
+async function removeVersion(version: ObjectVersion) {
+  if (!selectedBucketId.value || !versionsKey.value || !guardWriteAccess()) {return;}
+  versionsBusy.value = true;
+  try {
+    await $fetch(`/api/buckets/${selectedBucketId.value}/objects/versions`, {
+      method: "DELETE",
+      body: { key: versionsKey.value, versionId: version.versionId },
+    });
+    await loadVersions();
+    await refreshDocuments();
+  } catch (error: unknown) {
+    handleWriteError(error, "Could not delete version", versionsError);
+  } finally {
+    versionsBusy.value = false;
+  }
+}
 
 const openFile = async (filename: string) => {
   if (selectedBucketId.value) {
