@@ -36,7 +36,7 @@ jobs:
       uses: tchoupinax/repo-config/shared-actions/steps/node/build@master
       with:
         workingDirectory: apps/s3-viewer
-        nodeVersion: 26
+        nodeVersion: "26.12.1"
 
     - name: Docker meta
       id: meta
