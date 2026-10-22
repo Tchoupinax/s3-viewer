@@ -42,7 +42,7 @@ jobs:
       uses: tchoupinax/repo-config/shared-actions/steps/node/lint@master
       with:
         workingDirectory: apps/s3-viewer
-        nodeVersion: 26
+        nodeVersion: "26.12.1"
 
   lint-operator:
     name: Check operator code quality 🫆
@@ -67,7 +67,7 @@ jobs:
       uses: tchoupinax/repo-config/shared-actions/steps/node/build@v0
       with:
         workingDirectory: apps/s3-viewer
-        nodeVersion: 26
+        nodeVersion: "26.12.1"
 
   build-operator:
     name: Check operator build success 🦫
@@ -114,7 +114,7 @@ jobs:
       uses: tchoupinax/repo-config/shared-actions/steps/node/build@master
       with:
         workingDirectory: apps/s3-viewer
-        nodeVersion: 26
+        nodeVersion: "26.12.1"
 
     - name: Docker meta
       id: meta
