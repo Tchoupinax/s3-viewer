@@ -18,7 +18,7 @@
     "isReady": "pnpm build && pnpm lint && pnpm crd:generate && pnpm check"
   },
   "devDependencies": {
-    "turbo": "2.11.7"
+    "turbo": "2.11.10"
   },
-  "packageManager": "pnpm@12.10.1"
+  "packageManager": "pnpm@12.14.0"
 }
