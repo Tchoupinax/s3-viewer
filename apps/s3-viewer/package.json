@@ -14,29 +14,29 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1147.0",
-    "@aws-sdk/s3-request-presigner": "3.1152.0",
+    "@aws-sdk/client-s3": "3.1154.0",
+    "@aws-sdk/s3-request-presigner": "3.1154.0",
     "@nuxt/a11y": "1.0.0-alpha.1",
     "@nuxtjs/tailwindcss": "6.14.0",
-    "nuxt": "4.6.0",
+    "nuxt": "4.6.2",
     "pretty-bytes": "7.2.0",
     "shikiji": "0.10.2",
     "timeago.js": "4.0.2",
-    "ts-pattern": "5.9.0",
-    "vue": "3.5.43",
-    "vue-router": "5.3.1"
+    "ts-pattern": "5.9.2",
+    "vue": "3.5.44",
+    "vue-router": "5.4.0"
   },
   "devDependencies": {
     "@nuxt/eslint": "1.17.0",
-    "@nuxt/hints": "1.1.4",
-    "@playwright/test": "1.63.0",
-    "@types/node": "26.6.4",
-    "eslint": "10.12.0",
+    "@nuxt/hints": "1.1.5",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "eslint": "10.13.0",
     "eslint-config-tchoupinax": "2.6.1",
-    "npm-check-updates": "23.1.0",
+    "npm-check-updates": "23.1.1",
     "typescript": "^6.0.3",
     "vite-plugin-eslint2": "5.3.0",
-    "vue-tsc": "3.3.12"
+    "vue-tsc": "3.3.13"
   },
-  "packageManager": "pnpm@12.10.1"
+  "packageManager": "pnpm@12.14.0"
 }
