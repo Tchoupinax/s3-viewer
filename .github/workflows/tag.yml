@@ -8,7 +8,7 @@ on:
 jobs:
   build-application-docker:
     name: Build container for application 🐳
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       packages: write
 
@@ -65,7 +65,7 @@ jobs:
 
   build-operator-docker:
     name: Build container for operator 🐳
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       packages: write
 
